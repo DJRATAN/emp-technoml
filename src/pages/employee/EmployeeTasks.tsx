@@ -61,7 +61,7 @@ export default function EmployeeTasks() {
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div className="flex items-center gap-3 text-xs text-muted-foreground">
             {t.due_date && <span className="inline-flex items-center gap-1"><Calendar className="h-3 w-3" />Due {t.due_date}</span>}
-            <StatusBadge status={t.status === 'in_progress' ? 'in-progress' : t.status === 'completed' ? 'completed' : 'pending'} />
+            <StatusBadge status={t.status === 'in_progress' ? 'In Progress' : t.status === 'completed' ? 'Completed' : 'Pending'} />
           </div>
           <div className="flex gap-2">
             {t.status !== 'in_progress' && t.status !== 'completed' && (

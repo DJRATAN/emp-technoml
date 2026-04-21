@@ -47,71 +47,20 @@ export default function EmployeeAttendance() {
     setError(null); setStep('locating');
     if (!settings) { setError('Settings not loaded'); setStep('idle'); return; }
     try {
-      setStep('locating');
       const pos = await getCurrentPosition();
       const dist = haversineMeters(pos.coords.latitude, pos.coords.longitude, settings.office_latitude, settings.office_longitude);
       const verified = dist <= settings.geofence_radius_m;
       setPosition({ lat: pos.coords.latitude, lng: pos.coords.longitude, distance: dist, verified });
-      
       if (!verified) {
         setError(`You are ${Math.round(dist)}m from office. Move within ${settings.geofence_radius_m}m to mark attendance.`);
         setStep('idle'); return;
       }
-
-      setStep('camera');
-      if (!window.isSecureContext) {
-        throw new Error('Camera requires a secure connection (HTTPS or localhost). Please check your URL.');
-      }
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        throw new Error('Your browser does not support camera access. Please use Chrome, Safari, or Firefox.');
-      }
-
-      let stream: MediaStream;
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 640 } } });
-      } catch (err) {
-        console.warn('Primary camera constraints failed, trying fallback...', err);
-        stream = await navigator.mediaDevices.getUserMedia({ video: true });
-      }
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 640 } } });
       streamRef.current = stream;
-      
-      setTimeout(() => { 
-        if (videoRef.current) { 
-          videoRef.current.srcObject = stream; 
-          videoRef.current.play().catch((e) => {
-            console.error('Camera play error:', e);
-            setError('Could not start camera feed. Please check if another app is using the camera.');
-            setStep('idle');
-          }); 
-        } 
-      }, 50);
+      setStep('camera');
+      setTimeout(() => { if (videoRef.current) { videoRef.current.srcObject = stream; videoRef.current.play().catch(() => {}); } }, 50);
     } catch (e: any) {
-      console.error('Attendance error details:', e);
-      let msg = e?.message || 'Failed to start.';
-      
-      // Explicitly check for Geolocation errors
-      const isLocationError = step === 'locating' || (e instanceof GeolocationPositionError) || e?.code === 1 || e?.code === 2 || e?.code === 3;
-      
-      if (isLocationError) {
-        if (e?.code === 1 || e?.message?.includes('denied')) {
-          msg = 'Location access denied. Please click the lock icon in the address bar and allow Location.';
-        } else if (e?.code === 3 || e?.message?.includes('timeout')) {
-          msg = 'Location request timed out. Please ensure you have a clear view of the sky or use a stable Wi-Fi.';
-        } else {
-          msg = 'Could not determine your location. Please check your GPS settings.';
-        }
-      } else {
-        // Camera errors
-        if (e?.name === 'NotAllowedError' || e?.message?.includes('denied')) {
-          msg = 'Camera access denied. Please click the lock icon in the address bar and allow Camera.';
-        } else if (e?.name === 'NotFoundError' || e?.name === 'DevicesNotFoundError') {
-          msg = 'No camera found. Please connect a webcam.';
-        } else if (e?.name === 'NotReadableError' || e?.name === 'TrackStartError') {
-          msg = 'Camera is already in use by another app.';
-        }
-      }
-      
-      setError(msg);
+      setError(e?.message?.includes('denied') ? 'Permission denied. Allow location & camera access.' : (e?.message ?? 'Failed to start.'));
       setStep('idle');
     }
   }
@@ -145,10 +94,11 @@ export default function EmployeeAttendance() {
       const [h, m] = settings.work_start_time.split(':').map(Number);
       const cutoff = new Date(today); cutoff.setHours(h, m + settings.late_threshold_minutes, 0, 0);
       const status = today > cutoff ? 'late' : 'present';
+      if (!user.companyId) throw new Error('No company associated with this account');
       const { error: insErr } = await supabase.from('attendance').insert({
-        user_id: user.id, date: dateStr, check_in: today.toISOString(), selfie_path: filename,
-        latitude: position.lat, longitude: position.lng, distance_m: Math.round(position.distance),
-        location_verified: true, status,
+        user_id: user.id, company_id: user.companyId, date: dateStr, check_in: today.toISOString(),
+        selfie_path: filename, latitude: position.lat, longitude: position.lng,
+        distance_m: Math.round(position.distance), location_verified: true, status,
       });
       if (insErr) throw insErr;
       toast.success('Attendance marked successfully!');
@@ -180,7 +130,7 @@ export default function EmployeeAttendance() {
             {today ? (
               <div className="space-y-4">
                 <div className="flex items-center justify-between p-4 rounded-xl bg-success/10">
-                  <div><p className="text-sm text-muted-foreground">Status</p><StatusBadge status={today.status === 'late' ? 'late' : 'present'} /></div>
+                  <div><p className="text-sm text-muted-foreground">Status</p><StatusBadge status={today.status === 'late' ? 'Late' : 'Present'} /></div>
                   <CheckCircle2 className="h-8 w-8 text-success" />
                 </div>
                 <div className="grid grid-cols-2 gap-3 text-sm">
@@ -195,20 +145,8 @@ export default function EmployeeAttendance() {
                 <p className="text-muted-foreground mb-4">You haven't marked attendance today</p>
                 <Button size="lg" onClick={startFlow}><Camera className="h-4 w-4 mr-2" /> Mark Attendance</Button>
                 {error && (
-                  <div className="mt-4 p-3 rounded-xl bg-destructive/10 text-destructive text-sm space-y-2">
-                    <div className="flex items-start gap-2 text-left">
-                      <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5" /><span>{error}</span>
-                    </div>
-                    {window.location.hostname === 'localhost' && (
-                      <Button variant="ghost" size="sm" className="w-full text-xs hover:bg-destructive/5" 
-                        onClick={() => {
-                          setError(null);
-                          setStep('camera');
-                          setPosition({ lat: settings.office_latitude, lng: settings.office_longitude, distance: 0, verified: true });
-                        }}>
-                        Skip verification (Demo Mode)
-                      </Button>
-                    )}
+                  <div className="mt-4 p-3 rounded-xl bg-destructive/10 text-destructive text-sm flex items-start gap-2 text-left">
+                    <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5" /><span>{error}</span>
                   </div>
                 )}
               </div>
@@ -268,7 +206,7 @@ export default function EmployeeAttendance() {
                       <td className="py-3 pr-4">{formatTime(r.check_in)}</td>
                       <td className="py-3 pr-4">{formatTime(r.check_out)}</td>
                       <td className="py-3 pr-4">{r.distance_m ?? '—'}m</td>
-                      <td className="py-3"><StatusBadge status={r.status === 'late' ? 'late' : r.status === 'absent' ? 'absent' : 'present'} /></td>
+                      <td className="py-3"><StatusBadge status={r.status === 'late' ? 'Late' : r.status === 'absent' ? 'Absent' : 'Present'} /></td>
                     </tr>
                   ))}
                 </tbody>

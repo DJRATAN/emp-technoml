@@ -45,7 +45,7 @@ export default function AdminSettings() {
       annual_leave_quota: Number(form.annual_leave_quota),
       sick_leave_quota: Number(form.sick_leave_quota),
       casual_leave_quota: Number(form.casual_leave_quota),
-    }).eq('id', 1);
+    }).eq('company_id', form.company_id);
     setSaving(false);
     if (error) return toast.error(error.message);
     toast.success('Settings saved');

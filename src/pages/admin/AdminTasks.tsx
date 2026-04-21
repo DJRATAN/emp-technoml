@@ -36,21 +36,27 @@ export default function AdminTasks() {
 
   const load = useCallback(async () => {
     const [t, p] = await Promise.all([
-      supabase.from('tasks').select('*, profiles!tasks_assigned_to_fkey(full_name)').order('created_at', { ascending: false }),
+      supabase.from('tasks').select('*').order('created_at', { ascending: false }),
       supabase.from('profiles').select('id, full_name').eq('status', 'approved').order('full_name'),
     ]);
-    setTasks((t.data as any as Task[]) ?? []); setEmployees((p.data as any as Emp[]) ?? []); setLoading(false);
+    const profMap = new Map((p.data ?? []).map((e: any) => [e.id, e]));
+    const tasksWithNames = ((t.data ?? []) as any[]).map((task) => ({
+      ...task,
+      profiles: task.assigned_to ? profMap.get(task.assigned_to) : undefined,
+    }));
+    setTasks(tasksWithNames as Task[]); setEmployees((p.data as Emp[]) ?? []); setLoading(false);
   }, []);
 
   useEffect(() => { load(); }, [load]);
 
   async function create(e: React.FormEvent) {
     e.preventDefault();
-    if (!user || !title.trim() || !assignee) return;
+    if (!user || !user.companyId || !title.trim() || !assignee) return;
     setSubmitting(true);
     const { error } = await supabase.from('tasks').insert({
       title: title.trim(), description: desc.trim() || null, priority, status: 'pending',
       due_date: dueDate || null, assigned_to: assignee, assigned_by: user.id,
+      company_id: user.companyId,
     });
     setSubmitting(false);
     if (error) return toast.error(error.message);
@@ -117,7 +123,7 @@ export default function AdminTasks() {
                     <div className="flex items-center gap-2 mb-1 flex-wrap">
                       <h4 className="font-semibold">{t.title}</h4>
                       <Badge variant={priorityVariant[t.priority]}>{t.priority}</Badge>
-                      <StatusBadge status={t.status === 'in_progress' ? 'in-progress' : t.status === 'completed' ? 'completed' : 'pending'} />
+                      <StatusBadge status={t.status === 'in_progress' ? 'In Progress' : t.status === 'completed' ? 'Completed' : 'Pending'} />
                     </div>
                     {t.description && <p className="text-sm text-muted-foreground mb-1">{t.description}</p>}
                     <p className="text-xs text-muted-foreground">Assigned to <span className="font-medium text-foreground">{t.profiles?.full_name ?? 'Unassigned'}</span> · Due {t.due_date ?? '—'}</p>

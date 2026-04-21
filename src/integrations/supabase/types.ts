@@ -18,6 +18,7 @@ export type Database = {
         Row: {
           check_in: string | null
           check_out: string | null
+          company_id: string
           created_at: string
           date: string
           distance_m: number | null
@@ -33,6 +34,7 @@ export type Database = {
         Insert: {
           check_in?: string | null
           check_out?: string | null
+          company_id: string
           created_at?: string
           date?: string
           distance_m?: number | null
@@ -48,6 +50,7 @@ export type Database = {
         Update: {
           check_in?: string | null
           check_out?: string | null
+          company_id?: string
           created_at?: string
           date?: string
           distance_m?: number | null
@@ -60,15 +63,53 @@ export type Database = {
           status?: Database["public"]["Enums"]["attendance_status"]
           user_id?: string
         }
+        Relationships: [
+          {
+            foreignKeyName: "attendance_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      companies: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          owner_id: string | null
+          slug: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          owner_id?: string | null
+          slug: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          owner_id?: string | null
+          slug?: string
+          status?: string
+          updated_at?: string
+        }
         Relationships: []
       }
       company_settings: {
         Row: {
           annual_leave_quota: number
           casual_leave_quota: number
+          company_id: string
           company_name: string
           geofence_radius_m: number
-          id: number
           late_threshold_minutes: number
           office_latitude: number
           office_longitude: number
@@ -80,9 +121,9 @@ export type Database = {
         Insert: {
           annual_leave_quota?: number
           casual_leave_quota?: number
+          company_id: string
           company_name?: string
           geofence_radius_m?: number
-          id?: number
           late_threshold_minutes?: number
           office_latitude?: number
           office_longitude?: number
@@ -94,9 +135,9 @@ export type Database = {
         Update: {
           annual_leave_quota?: number
           casual_leave_quota?: number
+          company_id?: string
           company_name?: string
           geofence_radius_m?: number
-          id?: number
           late_threshold_minutes?: number
           office_latitude?: number
           office_longitude?: number
@@ -105,11 +146,20 @@ export type Database = {
           work_end_time?: string
           work_start_time?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "company_settings_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: true
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       leave_requests: {
         Row: {
           admin_notes: string | null
+          company_id: string
           created_at: string
           days: number
           end_date: string
@@ -125,6 +175,7 @@ export type Database = {
         }
         Insert: {
           admin_notes?: string | null
+          company_id: string
           created_at?: string
           days: number
           end_date: string
@@ -140,6 +191,7 @@ export type Database = {
         }
         Update: {
           admin_notes?: string | null
+          company_id?: string
           created_at?: string
           days?: number
           end_date?: string
@@ -153,11 +205,20 @@ export type Database = {
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "leave_requests_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
           avatar_url: string | null
+          company_id: string
           created_at: string
           department: string | null
           email: string
@@ -170,6 +231,7 @@ export type Database = {
         }
         Insert: {
           avatar_url?: string | null
+          company_id: string
           created_at?: string
           department?: string | null
           email: string
@@ -182,6 +244,7 @@ export type Database = {
         }
         Update: {
           avatar_url?: string | null
+          company_id?: string
           created_at?: string
           department?: string | null
           email?: string
@@ -192,12 +255,21 @@ export type Database = {
           status?: Database["public"]["Enums"]["account_status"]
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "profiles_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       tasks: {
         Row: {
           assigned_by: string | null
           assigned_to: string | null
+          company_id: string
           completed_at: string | null
           created_at: string
           description: string | null
@@ -211,6 +283,7 @@ export type Database = {
         Insert: {
           assigned_by?: string | null
           assigned_to?: string | null
+          company_id: string
           completed_at?: string | null
           created_at?: string
           description?: string | null
@@ -224,6 +297,7 @@ export type Database = {
         Update: {
           assigned_by?: string | null
           assigned_to?: string | null
+          company_id?: string
           completed_at?: string | null
           created_at?: string
           description?: string | null
@@ -234,7 +308,15 @@ export type Database = {
           title?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "tasks_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_roles: {
         Row: {
@@ -270,10 +352,12 @@ export type Database = {
         Returns: boolean
       }
       is_approved: { Args: { _user_id: string }; Returns: boolean }
+      is_super_admin: { Args: { _user_id: string }; Returns: boolean }
+      user_company: { Args: { _user_id: string }; Returns: string }
     }
     Enums: {
       account_status: "pending" | "approved" | "rejected" | "suspended"
-      app_role: "admin" | "employee"
+      app_role: "admin" | "employee" | "super_admin"
       attendance_status: "present" | "late" | "absent"
       leave_status: "pending" | "approved" | "rejected"
       leave_type: "casual" | "sick" | "annual" | "unpaid"
@@ -407,7 +491,7 @@ export const Constants = {
   public: {
     Enums: {
       account_status: ["pending", "approved", "rejected", "suspended"],
-      app_role: ["admin", "employee"],
+      app_role: ["admin", "employee", "super_admin"],
       attendance_status: ["present", "late", "absent"],
       leave_status: ["pending", "approved", "rejected"],
       leave_type: ["casual", "sick", "annual", "unpaid"],

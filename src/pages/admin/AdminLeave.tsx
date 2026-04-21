@@ -21,8 +21,14 @@ export default function AdminLeave() {
   const [busyId, setBusyId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    const { data } = await supabase.from('leave_requests').select('*, profiles(full_name, department, email)').order('created_at', { ascending: false });
-    setLeaves((data as any as Leave[]) ?? []); setLoading(false);
+    const { data } = await supabase.from('leave_requests').select('*').order('created_at', { ascending: false });
+    const ids = Array.from(new Set((data ?? []).map((l) => l.user_id)));
+    const { data: profs } = ids.length
+      ? await supabase.from('profiles').select('id, full_name, department, email').in('id', ids)
+      : { data: [] as any[] };
+    const map = new Map((profs ?? []).map((p: any) => [p.id, p]));
+    setLeaves(((data ?? []) as any[]).map((l) => ({ ...l, profiles: map.get(l.user_id) })) as Leave[]);
+    setLoading(false);
   }, []);
 
   useEffect(() => { load(); }, [load]);
@@ -49,7 +55,7 @@ export default function AdminLeave() {
             <p className="font-semibold">{l.profiles?.full_name ?? l.user_id}</p>
             <p className="text-xs text-muted-foreground">{l.profiles?.department} · {l.profiles?.email}</p>
           </div>
-          <StatusBadge status={l.status === 'approved' ? 'approved' : l.status === 'rejected' ? 'rejected' : 'pending'} />
+          <StatusBadge status={l.status === 'approved' ? 'Approved' : l.status === 'rejected' ? 'Rejected' : 'Pending'} />
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-sm mb-2">
           <div><span className="text-muted-foreground text-xs">Type</span><p className="capitalize">{l.leave_type}</p></div>

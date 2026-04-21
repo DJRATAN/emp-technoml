@@ -14,16 +14,8 @@ export function haversineMeters(lat1: number, lon1: number, lat2: number, lon2: 
 export function getCurrentPosition(): Promise<GeolocationPosition> {
   return new Promise((resolve, reject) => {
     if (!navigator.geolocation) return reject(new Error('Geolocation not supported'));
-    
-    // Try high accuracy first
-    navigator.geolocation.getCurrentPosition(resolve, (err) => {
-      // Fallback to low accuracy if high accuracy fails or times out
-      console.warn('High accuracy location failed, trying low accuracy...', err);
-      navigator.geolocation.getCurrentPosition(resolve, reject, {
-        enableHighAccuracy: false, timeout: 15000, maximumAge: 60000,
-      });
-    }, {
-      enableHighAccuracy: true, timeout: 8000, maximumAge: 0,
+    navigator.geolocation.getCurrentPosition(resolve, reject, {
+      enableHighAccuracy: true, timeout: 10000, maximumAge: 0,
     });
   });
 }

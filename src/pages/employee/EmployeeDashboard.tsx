@@ -76,7 +76,7 @@ export default function EmployeeDashboard() {
                       <p className="font-medium text-sm truncate">{t.title}</p>
                       <p className="text-xs text-muted-foreground">Due {t.due_date ?? '—'}</p>
                     </div>
-                    <StatusBadge status={t.status === 'in_progress' ? 'in-progress' : t.status === 'completed' ? 'completed' : 'pending'} />
+                    <StatusBadge status={t.status === 'in_progress' ? 'In Progress' : t.status === 'completed' ? 'Completed' : 'Pending'} />
                   </div>
                 ))}
               </div>

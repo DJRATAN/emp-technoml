@@ -24,9 +24,16 @@ export default function AdminAttendance() {
 
   useEffect(() => {
     setLoading(true);
-    supabase.from('attendance').select('*, profiles(full_name, department, email)').eq('date', date).order('check_in', { ascending: true }).then(({ data }) => {
-      setRows((data as any as Row[]) ?? []); setLoading(false);
-    });
+    (async () => {
+      const { data: att } = await supabase.from('attendance').select('*').eq('date', date).order('check_in', { ascending: true });
+      const ids = Array.from(new Set((att ?? []).map((a) => a.user_id)));
+      const { data: profs } = ids.length
+        ? await supabase.from('profiles').select('id, full_name, department, email').in('id', ids)
+        : { data: [] as any[] };
+      const map = new Map((profs ?? []).map((p: any) => [p.id, p]));
+      setRows(((att ?? []) as any[]).map((a) => ({ ...a, profiles: map.get(a.user_id) })) as Row[]);
+      setLoading(false);
+    })();
   }, [date]);
 
   async function viewSelfie(path: string, name: string) {
@@ -73,7 +80,7 @@ export default function AdminAttendance() {
                           {r.distance_m ?? '—'}m
                         </div>
                       </td>
-                      <td className="py-3 pr-4"><StatusBadge status={r.status === 'late' ? 'late' : r.status === 'absent' ? 'absent' : 'present'} /></td>
+                      <td className="py-3 pr-4"><StatusBadge status={r.status === 'late' ? 'Late' : r.status === 'absent' ? 'Absent' : 'Present'} /></td>
                       <td className="py-3">
                         {r.selfie_path ? (
                           <Button size="sm" variant="outline" onClick={() => viewSelfie(r.selfie_path!, r.profiles?.full_name ?? '')}>

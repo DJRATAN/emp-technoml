@@ -37,11 +37,11 @@ export default function EmployeeLeave() {
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!user || !start || !end || !reason.trim()) return;
+    if (!user || !user.companyId || !start || !end || !reason.trim()) return;
     if (end < start) return toast.error('End date cannot be before start date');
     setSubmitting(true);
     const { error } = await supabase.from('leave_requests').insert({
-      user_id: user.id, leave_type: type, start_date: start, end_date: end,
+      user_id: user.id, company_id: user.companyId, leave_type: type, start_date: start, end_date: end,
       days: daysBetween(start, end), reason: reason.trim(), status: 'pending',
     });
     setSubmitting(false);
@@ -121,7 +121,7 @@ export default function EmployeeLeave() {
                   <div key={l.id} className="p-3 rounded-xl bg-muted/40">
                     <div className="flex justify-between items-start mb-1">
                       <span className="font-medium capitalize">{l.leave_type} · {l.days}d</span>
-                      <StatusBadge status={l.status === 'approved' ? 'approved' : l.status === 'rejected' ? 'rejected' : 'pending'} />
+                      <StatusBadge status={l.status === 'approved' ? 'Approved' : l.status === 'rejected' ? 'Rejected' : 'Pending'} />
                     </div>
                     <p className="text-xs text-muted-foreground mb-1">{l.start_date} → {l.end_date}</p>
                     <p className="text-sm">{l.reason}</p>

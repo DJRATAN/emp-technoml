@@ -31,6 +31,11 @@ Deno.serve(async (req) => {
 
     const log: string[] = [];
 
+    // Resolve TechnoML tenant
+    const { data: company } = await supabase.from('companies').select('id').eq('slug', 'technoml').maybeSingle();
+    if (!company) throw new Error('TechnoML company not found — run the migration first');
+    const COMPANY_ID = company.id;
+
     // Helper: get or create user
     async function ensureUser(email: string, password: string, meta: Record<string, unknown>) {
       const { data: list } = await supabase.auth.admin.listUsers();
@@ -47,13 +52,26 @@ Deno.serve(async (req) => {
       return data.user.id;
     }
 
+    async function ensureProfile(id: string, fields: Record<string, unknown>) {
+      const { data: existing } = await supabase.from('profiles').select('id').eq('id', id).maybeSingle();
+      if (existing) {
+        await supabase.from('profiles').update(fields).eq('id', id);
+      } else {
+        await supabase.from('profiles').insert({ id, company_id: COMPANY_ID, ...fields });
+      }
+    }
+
     // 1. Admin
     const adminId = await ensureUser(ADMIN_EMAIL, ADMIN_PASSWORD, {
       full_name: 'TechnoML Admin', department: 'Management', job_title: 'Administrator',
     });
-    await supabase.from('profiles').update({ status: 'approved', full_name: 'TechnoML Admin', department: 'Management', job_title: 'Administrator' }).eq('id', adminId);
-    await supabase.from('user_roles').delete().eq('user_id', adminId);
-    await supabase.from('user_roles').insert({ user_id: adminId, role: 'admin' });
+    await ensureProfile(adminId, {
+      email: ADMIN_EMAIL, full_name: 'TechnoML Admin', department: 'Management',
+      job_title: 'Administrator', status: 'approved', company_id: COMPANY_ID,
+    });
+    await supabase.from('user_roles').upsert({ user_id: adminId, role: 'admin' }, { onConflict: 'user_id,role' });
+    await supabase.from('user_roles').upsert({ user_id: adminId, role: 'super_admin' }, { onConflict: 'user_id,role' });
+    await supabase.from('companies').update({ owner_id: adminId }).eq('id', COMPANY_ID);
 
     // 2. Demo employees
     const employeeIds: string[] = [];
@@ -66,13 +84,10 @@ Deno.serve(async (req) => {
         job_title: TITLES[i],
       });
       employeeIds.push(id);
-      await supabase.from('profiles').update({
-        status: i < 4 ? 'approved' : 'pending', // last one stays pending so admin sees the approval flow
-        full_name: emp.full_name,
-        phone: emp.phone,
-        department: DEPARTMENTS[i],
-        job_title: TITLES[i],
-      }).eq('id', id);
+      await ensureProfile(id, {
+        email: emp.email, status: i < 4 ? 'approved' : 'pending', full_name: emp.full_name,
+        phone: emp.phone, department: DEPARTMENTS[i], job_title: TITLES[i], company_id: COMPANY_ID,
+      });
     }
 
     // 3. Seed tasks (only for approved employees)
@@ -90,6 +105,7 @@ Deno.serve(async (req) => {
         { title: 'Office supply restock', description: 'Place order for stationery and pantry items', priority: 'low', status: 'completed', assigned_to: employeeIds[3] },
       ].map((t, idx) => ({
         ...t,
+        company_id: COMPANY_ID,
         assigned_by: adminId,
         due_date: new Date(today.getTime() + (idx - 2) * 86400000).toISOString().split('T')[0],
         completed_at: t.status === 'completed' ? new Date().toISOString() : null,
@@ -105,10 +121,10 @@ Deno.serve(async (req) => {
       const fmt = (d: Date) => d.toISOString().split('T')[0];
       const addDays = (n: number) => new Date(today.getTime() + n * 86400000);
       const leaveRows = [
-        { user_id: employeeIds[0], leave_type: 'casual', start_date: fmt(addDays(3)), end_date: fmt(addDays(4)), days: 2, reason: 'Family function', status: 'pending' },
-        { user_id: employeeIds[1], leave_type: 'sick', start_date: fmt(addDays(-5)), end_date: fmt(addDays(-4)), days: 2, reason: 'Fever and rest', status: 'approved', reviewed_by: adminId, reviewed_at: new Date().toISOString() },
-        { user_id: employeeIds[2], leave_type: 'annual', start_date: fmt(addDays(10)), end_date: fmt(addDays(14)), days: 5, reason: 'Annual vacation', status: 'pending' },
-        { user_id: employeeIds[3], leave_type: 'casual', start_date: fmt(addDays(-10)), end_date: fmt(addDays(-10)), days: 1, reason: 'Personal work', status: 'rejected', reviewed_by: adminId, reviewed_at: new Date().toISOString(), admin_notes: 'Project deadline that day' },
+        { company_id: COMPANY_ID, user_id: employeeIds[0], leave_type: 'casual', start_date: fmt(addDays(3)), end_date: fmt(addDays(4)), days: 2, reason: 'Family function', status: 'pending' },
+        { company_id: COMPANY_ID, user_id: employeeIds[1], leave_type: 'sick', start_date: fmt(addDays(-5)), end_date: fmt(addDays(-4)), days: 2, reason: 'Fever and rest', status: 'approved', reviewed_by: adminId, reviewed_at: new Date().toISOString() },
+        { company_id: COMPANY_ID, user_id: employeeIds[2], leave_type: 'annual', start_date: fmt(addDays(10)), end_date: fmt(addDays(14)), days: 5, reason: 'Annual vacation', status: 'pending' },
+        { company_id: COMPANY_ID, user_id: employeeIds[3], leave_type: 'casual', start_date: fmt(addDays(-10)), end_date: fmt(addDays(-10)), days: 1, reason: 'Personal work', status: 'rejected', reviewed_by: adminId, reviewed_at: new Date().toISOString(), admin_notes: 'Project deadline that day' },
       ];
       await supabase.from('leave_requests').insert(leaveRows);
       log.push(`seeded ${leaveRows.length} leave requests`);
@@ -131,6 +147,7 @@ Deno.serve(async (req) => {
           const checkOut = new Date(date);
           checkOut.setHours(18, Math.floor(Math.random() * 30), 0);
           attRows.push({
+            company_id: COMPANY_ID,
             user_id: employeeIds[i],
             date: dateStr,
             check_in: checkIn.toISOString(),

@@ -1,8 +1,8 @@
 import { useAuth } from '@/contexts/AuthContext';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Clock, CheckSquare, CalendarDays, TrendingUp,
-  User, Users, FileBarChart, Settings, LogOut, Building2
+  User, Users, FileBarChart, Settings, LogOut, Building2, Globe
 } from 'lucide-react';
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent,
@@ -31,12 +31,18 @@ const adminMenu = [
   { title: 'Settings', url: '/admin/settings', icon: Settings },
 ];
 
+const superAdminMenu = [
+  { title: 'Companies', url: '/super-admin', icon: Globe },
+  { title: 'My Company', url: '/admin', icon: Building2 },
+];
+
 export function AppSidebar() {
   const { user, logout } = useAuth();
   const { state } = useSidebar();
   const collapsed = state === 'collapsed';
   const navigate = useNavigate();
-  const menu = user?.role === 'admin' ? adminMenu : employeeMenu;
+  const menu = user?.role === 'super_admin' ? superAdminMenu
+    : user?.role === 'admin' ? adminMenu : employeeMenu;
 
   const handleLogout = async () => {
     await logout();
@@ -49,7 +55,7 @@ export function AppSidebar() {
         <SidebarGroup>
           <SidebarGroupLabel className="gap-2">
             <Building2 className="h-4 w-4 text-primary" />
-            {!collapsed && <span className="font-heading font-semibold text-primary">EMS Pro</span>}
+            {!collapsed && <span className="font-heading font-semibold text-primary">TechnoML</span>}
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
@@ -58,7 +64,7 @@ export function AppSidebar() {
                   <SidebarMenuButton asChild>
                     <NavLink
                       to={item.url}
-                      end={item.url === '/admin' || item.url === '/employee'}
+                      end={item.url === '/admin' || item.url === '/employee' || item.url === '/super-admin'}
                       className="hover:bg-sidebar-accent/50"
                       activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium"
                     >
@@ -77,6 +83,7 @@ export function AppSidebar() {
           <div className="mb-2 px-2">
             <p className="text-sm font-medium truncate">{user.name}</p>
             <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+            {user.company && <p className="text-[10px] text-muted-foreground truncate uppercase tracking-wide">{user.company.slug}</p>}
           </div>
         )}
         <Button variant="ghost" size="sm" className="w-full justify-start text-destructive hover:text-destructive hover:bg-destructive/10" onClick={handleLogout}>

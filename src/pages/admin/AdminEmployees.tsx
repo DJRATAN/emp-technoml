@@ -98,7 +98,7 @@ export default function AdminEmployees() {
                       <td className="py-3 pr-4 text-muted-foreground">{p.email}</td>
                       <td className="py-3 pr-4">{p.department ?? '—'}</td>
                       <td className="py-3 pr-4">{p.job_title ?? '—'}</td>
-                      <td className="py-3 pr-4"><StatusBadge status={p.status === 'approved' ? 'active' : p.status === 'pending' ? 'pending' : p.status === 'suspended' ? 'inactive' : 'rejected'} /></td>
+                      <td className="py-3 pr-4"><StatusBadge status={p.status === 'approved' ? 'Active' : p.status === 'pending' ? 'Pending' : p.status === 'suspended' ? 'Suspended' : 'Rejected'} /></td>
                       <td className="py-3">
                         {p.status === 'approved' ? (
                           <Button size="sm" variant="outline" disabled={busyId === p.id} onClick={() => changeStatus(p.id, 'suspended')}>
