@@ -45,6 +45,7 @@ export default function AdminSettings() {
       annual_leave_quota: Number(form.annual_leave_quota),
       sick_leave_quota: Number(form.sick_leave_quota),
       casual_leave_quota: Number(form.casual_leave_quota),
+      leave_approval_sla_hours: Number(form.leave_approval_sla_hours),
     }).eq('company_id', form.company_id);
     setSaving(false);
     if (error) return toast.error(error.message);
@@ -95,6 +96,12 @@ export default function AdminSettings() {
             <div className="space-y-2"><Label>Annual</Label><Input type="number" min={0} value={form.annual_leave_quota} onChange={(e) => update('annual_leave_quota', e.target.value)} /></div>
             <div className="space-y-2"><Label>Sick</Label><Input type="number" min={0} value={form.sick_leave_quota} onChange={(e) => update('sick_leave_quota', e.target.value)} /></div>
             <div className="space-y-2"><Label>Casual</Label><Input type="number" min={0} value={form.casual_leave_quota} onChange={(e) => update('casual_leave_quota', e.target.value)} /></div>
+          </div>
+          <div className="space-y-2 pt-2 border-t">
+            <Label>Leave-approval SLA (hours)</Label>
+            <Input type="number" min={1} max={720} value={form.leave_approval_sla_hours ?? 48}
+              onChange={(e) => update('leave_approval_sla_hours', e.target.value)} />
+            <p className="text-xs text-muted-foreground">Time admins have to review each request. Employees see a countdown until this deadline.</p>
           </div>
         </Card>
 

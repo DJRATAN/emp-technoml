@@ -6,16 +6,19 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { Check, X, Loader2 } from 'lucide-react';
+import { useCompanySettings } from '@/hooks/useCompanySettings';
+import { leaveDeadlineMs, formatRemaining, deadlineSeverity } from '@/lib/sla';
+import { Check, X, Loader2, Clock } from 'lucide-react';
 import { toast } from 'sonner';
 
 type Leave = { id: string; user_id: string; leave_type: string; start_date: string; end_date: string;
-  days: number; reason: string; status: 'pending'|'approved'|'rejected'; admin_notes: string | null;
+  days: number; reason: string; status: 'pending'|'approved'|'rejected'; admin_notes: string | null; created_at: string;
   profiles?: { full_name: string; department: string | null; email: string };
 };
 
 export default function AdminLeave() {
   const { user } = useAuth();
+  const { settings } = useCompanySettings();
   const [leaves, setLeaves] = useState<Leave[]>([]);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -48,6 +51,11 @@ export default function AdminLeave() {
   function filtered(s?: string) { return s ? leaves.filter((l) => l.status === s) : leaves; }
 
   function Row({ l }: { l: Leave }) {
+    const sla = settings?.leave_approval_sla_hours ?? 48;
+    const showCountdown = l.status === 'pending' && l.created_at;
+    const deadline = showCountdown ? leaveDeadlineMs(l.created_at, sla) : 0;
+    const severity = showCountdown ? deadlineSeverity(deadline) : 'safe';
+    const sevClass = severity === 'overdue' ? 'text-destructive' : severity === 'soon' ? 'text-warning' : 'text-muted-foreground';
     return (
       <div className="p-4 rounded-xl bg-muted/30 border">
         <div className="flex items-start justify-between gap-4 flex-wrap mb-2">
@@ -55,7 +63,14 @@ export default function AdminLeave() {
             <p className="font-semibold">{l.profiles?.full_name ?? l.user_id}</p>
             <p className="text-xs text-muted-foreground">{l.profiles?.department} · {l.profiles?.email}</p>
           </div>
-          <StatusBadge status={l.status === 'approved' ? 'Approved' : l.status === 'rejected' ? 'Rejected' : 'Pending'} />
+          <div className="flex items-center gap-2">
+            {showCountdown && (
+              <span className={`text-xs flex items-center gap-1 ${sevClass}`}>
+                <Clock className="h-3 w-3" /> {formatRemaining(deadline)}
+              </span>
+            )}
+            <StatusBadge status={l.status === 'approved' ? 'Approved' : l.status === 'rejected' ? 'Rejected' : 'Pending'} />
+          </div>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-sm mb-2">
           <div><span className="text-muted-foreground text-xs">Type</span><p className="capitalize">{l.leave_type}</p></div>

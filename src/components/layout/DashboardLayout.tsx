@@ -1,7 +1,7 @@
 import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { AppSidebar } from './AppSidebar';
 import { useAuth } from '@/contexts/AuthContext';
-import { Bell, Moon, Sun, UserCheck, CalendarDays, AlertTriangle, User as UserIcon, LogOut, Settings } from 'lucide-react';
+import { Moon, Sun, UserCheck, CalendarDays, AlertTriangle, User as UserIcon, LogOut, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
@@ -12,6 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { useNavigate } from 'react-router-dom';
 import { useAdminNotifications, NotificationItem } from '@/hooks/useAdminNotifications';
 import { useTheme } from '@/hooks/useTheme';
+import { NotificationsBell } from '@/components/NotificationsBell';
 
 const iconFor = (kind: NotificationItem['kind']) => {
   if (kind === 'pending_employee') return UserCheck;
@@ -25,7 +26,8 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { items, count } = useAdminNotifications();
   const { theme, toggle } = useTheme();
   const navigate = useNavigate();
-  const showNotifications = user?.role === 'admin' || user?.role === 'super_admin';
+  const showAdminNotifications = user?.role === 'admin' || user?.role === 'super_admin';
+  const showUserNotifications = !!user;
 
   const profilePath =
     user?.role === 'employee' ? '/employee/profile'
@@ -54,13 +56,14 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
               <Button variant="ghost" size="icon" onClick={toggle} aria-label="Toggle theme">
                 {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
               </Button>
-              {showNotifications && (
+              {showUserNotifications && <NotificationsBell />}
+              {showAdminNotifications && (
                 <Popover>
                   <PopoverTrigger asChild>
-                    <Button variant="ghost" size="icon" className="relative" aria-label="Notifications">
-                      <Bell className="h-4 w-4" />
+                    <Button variant="ghost" size="icon" className="relative" aria-label="Admin queue">
+                      <AlertTriangle className="h-4 w-4" />
                       {count > 0 && (
-                        <span className="absolute -top-0.5 -right-0.5 h-4 min-w-4 px-1 rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold flex items-center justify-center">
+                        <span className="absolute -top-0.5 -right-0.5 h-4 min-w-4 px-1 rounded-full bg-warning text-warning-foreground text-[10px] font-bold flex items-center justify-center">
                           {count > 99 ? '99+' : count}
                         </span>
                       )}
@@ -68,7 +71,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
                   </PopoverTrigger>
                   <PopoverContent align="end" className="w-80 p-0">
                     <div className="px-4 py-3 border-b flex items-center justify-between">
-                      <h4 className="font-heading font-semibold">Notifications</h4>
+                      <h4 className="font-heading font-semibold">Admin Queue</h4>
                       <Badge variant="secondary">{count}</Badge>
                     </div>
                     <div className="max-h-96 overflow-y-auto">

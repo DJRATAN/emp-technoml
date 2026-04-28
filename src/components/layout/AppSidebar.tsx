@@ -2,7 +2,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Clock, CheckSquare, CalendarDays, TrendingUp,
-  User, Users, FileBarChart, Settings, LogOut, Building2, Globe
+  User, Users, FileBarChart, Settings, LogOut, Building2, Globe, Target
 } from 'lucide-react';
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent,
@@ -16,6 +16,7 @@ const employeeMenu = [
   { title: 'Dashboard', url: '/employee', icon: LayoutDashboard },
   { title: 'Attendance', url: '/employee/attendance', icon: Clock },
   { title: 'Tasks', url: '/employee/tasks', icon: CheckSquare },
+  { title: 'My Targets', url: '/employee/targets', icon: Target },
   { title: 'Leave', url: '/employee/leave', icon: CalendarDays },
   { title: 'Performance', url: '/employee/performance', icon: TrendingUp },
   { title: 'Profile', url: '/employee/profile', icon: User },
@@ -26,6 +27,7 @@ const adminMenu = [
   { title: 'Employees', url: '/admin/employees', icon: Users },
   { title: 'Attendance', url: '/admin/attendance', icon: Clock },
   { title: 'Tasks', url: '/admin/tasks', icon: CheckSquare },
+  { title: 'Targets', url: '/admin/targets', icon: Target },
   { title: 'Leave Requests', url: '/admin/leave', icon: CalendarDays },
   { title: 'Reports', url: '/admin/reports', icon: FileBarChart },
   { title: 'Settings', url: '/admin/settings', icon: Settings },

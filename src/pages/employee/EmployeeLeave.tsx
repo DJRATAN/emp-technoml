@@ -12,11 +12,12 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useCompanySettings } from '@/hooks/useCompanySettings';
 import { daysBetween } from '@/lib/helpers';
+import { leaveDeadlineMs, formatRemaining, deadlineSeverity } from '@/lib/sla';
 import { toast } from 'sonner';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Clock } from 'lucide-react';
 
 type Leave = { id: string; leave_type: 'casual'|'sick'|'annual'|'unpaid'; start_date: string;
-  end_date: string; days: number; reason: string; status: 'pending'|'approved'|'rejected'; admin_notes: string | null; };
+  end_date: string; days: number; reason: string; status: 'pending'|'approved'|'rejected'; admin_notes: string | null; created_at: string; };
 
 export default function EmployeeLeave() {
   const { user } = useAuth();
@@ -117,17 +118,29 @@ export default function EmployeeLeave() {
               <p className="text-sm text-muted-foreground py-8 text-center">No leave requests yet.</p>
             ) : (
               <div className="space-y-3 max-h-96 overflow-y-auto">
-                {leaves.map((l) => (
-                  <div key={l.id} className="p-3 rounded-xl bg-muted/40">
-                    <div className="flex justify-between items-start mb-1">
-                      <span className="font-medium capitalize">{l.leave_type} · {l.days}d</span>
-                      <StatusBadge status={l.status === 'approved' ? 'Approved' : l.status === 'rejected' ? 'Rejected' : 'Pending'} />
+                {leaves.map((l) => {
+                  const sla = settings?.leave_approval_sla_hours ?? 48;
+                  const showCountdown = l.status === 'pending' && l.created_at;
+                  const deadline = showCountdown ? leaveDeadlineMs(l.created_at, sla) : 0;
+                  const severity = showCountdown ? deadlineSeverity(deadline) : 'safe';
+                  const sevClass = severity === 'overdue' ? 'text-destructive' : severity === 'soon' ? 'text-warning' : 'text-muted-foreground';
+                  return (
+                    <div key={l.id} className="p-3 rounded-xl bg-muted/40">
+                      <div className="flex justify-between items-start mb-1">
+                        <span className="font-medium capitalize">{l.leave_type} · {l.days}d</span>
+                        <StatusBadge status={l.status === 'approved' ? 'Approved' : l.status === 'rejected' ? 'Rejected' : 'Pending'} />
+                      </div>
+                      <p className="text-xs text-muted-foreground mb-1">{l.start_date} → {l.end_date}</p>
+                      <p className="text-sm">{l.reason}</p>
+                      {showCountdown && (
+                        <p className={`text-xs flex items-center gap-1 mt-1.5 ${sevClass}`}>
+                          <Clock className="h-3 w-3" /> Approval {formatRemaining(deadline)}
+                        </p>
+                      )}
+                      {l.admin_notes && <p className="text-xs italic text-muted-foreground mt-1">Admin: {l.admin_notes}</p>}
                     </div>
-                    <p className="text-xs text-muted-foreground mb-1">{l.start_date} → {l.end_date}</p>
-                    <p className="text-sm">{l.reason}</p>
-                    {l.admin_notes && <p className="text-xs italic text-muted-foreground mt-1">Admin: {l.admin_notes}</p>}
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </Card>

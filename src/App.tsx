@@ -12,7 +12,9 @@ import EmployeeTasks from "./pages/employee/EmployeeTasks";
 import EmployeeLeave from "./pages/employee/EmployeeLeave";
 import EmployeePerformance from "./pages/employee/EmployeePerformance";
 import EmployeeProfile from "./pages/employee/EmployeeProfile";
+import EmployeeTargets from "./pages/employee/EmployeeTargets";
 import AdminDashboard from "./pages/admin/AdminDashboard";
+import AdminTargets from "./pages/admin/AdminTargets";
 import AdminEmployees from "./pages/admin/AdminEmployees";
 import AdminAttendance from "./pages/admin/AdminAttendance";
 import AdminTasks from "./pages/admin/AdminTasks";
@@ -79,8 +81,10 @@ function AppRoutes() {
       <Route path="/employee/leave" element={<ProtectedRoute allow={['employee']}><EmployeeLeave /></ProtectedRoute>} />
       <Route path="/employee/performance" element={<ProtectedRoute allow={['employee']}><EmployeePerformance /></ProtectedRoute>} />
       <Route path="/employee/profile" element={<ProtectedRoute allow={['employee']}><EmployeeProfile /></ProtectedRoute>} />
+      <Route path="/employee/targets" element={<ProtectedRoute allow={['employee']}><EmployeeTargets /></ProtectedRoute>} />
 
       <Route path="/admin" element={<ProtectedRoute allow={['admin', 'super_admin']}><AdminDashboard /></ProtectedRoute>} />
+      <Route path="/admin/targets" element={<ProtectedRoute allow={['admin', 'super_admin']}><AdminTargets /></ProtectedRoute>} />
       <Route path="/admin/employees" element={<ProtectedRoute allow={['admin', 'super_admin']}><AdminEmployees /></ProtectedRoute>} />
       <Route path="/admin/attendance" element={<ProtectedRoute allow={['admin', 'super_admin']}><AdminAttendance /></ProtectedRoute>} />
       <Route path="/admin/tasks" element={<ProtectedRoute allow={['admin', 'super_admin']}><AdminTasks /></ProtectedRoute>} />

@@ -111,6 +111,7 @@ export type Database = {
           company_name: string
           geofence_radius_m: number
           late_threshold_minutes: number
+          leave_approval_sla_hours: number
           office_latitude: number
           office_longitude: number
           sick_leave_quota: number
@@ -125,6 +126,7 @@ export type Database = {
           company_name?: string
           geofence_radius_m?: number
           late_threshold_minutes?: number
+          leave_approval_sla_hours?: number
           office_latitude?: number
           office_longitude?: number
           sick_leave_quota?: number
@@ -139,6 +141,7 @@ export type Database = {
           company_name?: string
           geofence_radius_m?: number
           late_threshold_minutes?: number
+          leave_approval_sla_hours?: number
           office_latitude?: number
           office_longitude?: number
           sick_leave_quota?: number
@@ -215,41 +218,170 @@ export type Database = {
           },
         ]
       }
+      loan_target_history: {
+        Row: {
+          bank: string
+          changed_at: string
+          changed_by: string
+          company_id: string
+          field: string
+          id: string
+          loan_target_id: string
+          month: string
+          new_value: number | null
+          old_value: number | null
+          user_id: string
+        }
+        Insert: {
+          bank: string
+          changed_at?: string
+          changed_by: string
+          company_id: string
+          field: string
+          id?: string
+          loan_target_id: string
+          month: string
+          new_value?: number | null
+          old_value?: number | null
+          user_id: string
+        }
+        Update: {
+          bank?: string
+          changed_at?: string
+          changed_by?: string
+          company_id?: string
+          field?: string
+          id?: string
+          loan_target_id?: string
+          month?: string
+          new_value?: number | null
+          old_value?: number | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      loan_targets: {
+        Row: {
+          achieved: number
+          bank: string
+          company_id: string
+          created_at: string
+          id: string
+          month: string
+          notes: string | null
+          target: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          achieved?: number
+          bank: string
+          company_id: string
+          created_at?: string
+          id?: string
+          month: string
+          notes?: string | null
+          target?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          achieved?: number
+          bank?: string
+          company_id?: string
+          created_at?: string
+          id?: string
+          month?: string
+          notes?: string | null
+          target?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      notifications: {
+        Row: {
+          body: string | null
+          company_id: string
+          created_at: string
+          id: string
+          link: string | null
+          read: boolean
+          title: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          body?: string | null
+          company_id: string
+          created_at?: string
+          id?: string
+          link?: string | null
+          read?: boolean
+          title: string
+          type: string
+          user_id: string
+        }
+        Update: {
+          body?: string | null
+          company_id?: string
+          created_at?: string
+          id?: string
+          link?: string | null
+          read?: boolean
+          title?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
+          address: string | null
           avatar_url: string | null
           company_id: string
           created_at: string
+          date_of_birth: string | null
           department: string | null
           email: string
+          emergency_contact: string | null
           full_name: string
           id: string
+          id_card_url: string | null
           job_title: string | null
           phone: string | null
           status: Database["public"]["Enums"]["account_status"]
           updated_at: string
         }
         Insert: {
+          address?: string | null
           avatar_url?: string | null
           company_id: string
           created_at?: string
+          date_of_birth?: string | null
           department?: string | null
           email: string
+          emergency_contact?: string | null
           full_name: string
           id: string
+          id_card_url?: string | null
           job_title?: string | null
           phone?: string | null
           status?: Database["public"]["Enums"]["account_status"]
           updated_at?: string
         }
         Update: {
+          address?: string | null
           avatar_url?: string | null
           company_id?: string
           created_at?: string
+          date_of_birth?: string | null
           department?: string | null
           email?: string
+          emergency_contact?: string | null
           full_name?: string
           id?: string
+          id_card_url?: string | null
           job_title?: string | null
           phone?: string | null
           status?: Database["public"]["Enums"]["account_status"]
@@ -275,8 +407,12 @@ export type Database = {
           description: string | null
           due_date: string | null
           id: string
+          is_target: boolean
           priority: Database["public"]["Enums"]["task_priority"]
+          progress_count: number
           status: Database["public"]["Enums"]["task_status"]
+          target_count: number | null
+          target_month: string | null
           title: string
           updated_at: string
         }
@@ -289,8 +425,12 @@ export type Database = {
           description?: string | null
           due_date?: string | null
           id?: string
+          is_target?: boolean
           priority?: Database["public"]["Enums"]["task_priority"]
+          progress_count?: number
           status?: Database["public"]["Enums"]["task_status"]
+          target_count?: number | null
+          target_month?: string | null
           title: string
           updated_at?: string
         }
@@ -303,8 +443,12 @@ export type Database = {
           description?: string | null
           due_date?: string | null
           id?: string
+          is_target?: boolean
           priority?: Database["public"]["Enums"]["task_priority"]
+          progress_count?: number
           status?: Database["public"]["Enums"]["task_status"]
+          target_count?: number | null
+          target_month?: string | null
           title?: string
           updated_at?: string
         }

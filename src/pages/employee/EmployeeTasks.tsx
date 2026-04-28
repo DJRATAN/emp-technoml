@@ -3,15 +3,18 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { Calendar, Loader2 } from 'lucide-react';
+import { Calendar, Loader2, Target } from 'lucide-react';
 import { toast } from 'sonner';
 
 type Task = { id: string; title: string; description: string | null; priority: 'low'|'medium'|'high';
-  status: 'pending'|'in_progress'|'completed'; due_date: string | null; };
+  status: 'pending'|'in_progress'|'completed'; due_date: string | null;
+  is_target: boolean; target_month: string | null; target_count: number | null; progress_count: number; };
 
 const priorityVariant: Record<string, 'destructive' | 'default' | 'secondary'> = {
   high: 'destructive', medium: 'default', low: 'secondary',
@@ -50,7 +53,54 @@ export default function EmployeeTasks() {
 
   function filter(status?: string) { return status ? tasks.filter((t) => t.status === status) : tasks; }
 
+  async function saveProgress(t: Task, value: number) {
+    setUpdatingId(t.id);
+    const total = t.target_count ?? 0;
+    const v = Math.max(0, Math.min(total || value, value));
+    const update: any = { progress_count: v };
+    if (total && v >= total) { update.status = 'completed'; update.completed_at = new Date().toISOString(); }
+    else if (v > 0) { update.status = 'in_progress'; }
+    const { error } = await supabase.from('tasks').update(update).eq('id', t.id);
+    setUpdatingId(null);
+    if (error) return toast.error(error.message);
+    toast.success('Progress updated'); load();
+  }
+
+  function TargetTaskCard({ t }: { t: Task }) {
+    const [draft, setDraft] = useState(String(t.progress_count ?? 0));
+    const total = t.target_count ?? 0;
+    const pct = total ? Math.min(100, Math.round((t.progress_count / total) * 100)) : 0;
+    const monthLabel = t.target_month
+      ? new Date(t.target_month).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+      : '—';
+    return (
+      <Card className="p-5 space-y-3">
+        <div className="flex items-start justify-between gap-3 flex-wrap">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <Target className="h-4 w-4 text-primary" />
+              <h4 className="font-semibold">{t.title}</h4>
+              <Badge variant="secondary">{monthLabel}</Badge>
+              <StatusBadge status={t.status === 'in_progress' ? 'In Progress' : t.status === 'completed' ? 'Completed' : 'Pending'} />
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">{t.progress_count}/{total} completed</p>
+          </div>
+        </div>
+        <Progress value={pct} className="h-2" />
+        <div className="flex items-end gap-2">
+          <Input type="number" min={0} max={total || undefined} value={draft}
+            onChange={(e) => setDraft(e.target.value)} className="w-28 h-9" />
+          <Button size="sm" disabled={updatingId === t.id || Number(draft) === t.progress_count}
+            onClick={() => saveProgress(t, Number(draft))}>
+            {updatingId === t.id ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Update'}
+          </Button>
+        </div>
+      </Card>
+    );
+  }
+
   function TaskCard({ t }: { t: Task }) {
+    if (t.is_target) return <TargetTaskCard t={t} />;
     return (
       <Card className="p-5">
         <div className="flex items-start justify-between gap-4 mb-2">

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -6,33 +6,55 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { Plus, Loader2, Trash2 } from 'lucide-react';
+import { Plus, Loader2, Trash2, Target } from 'lucide-react';
 import { toast } from 'sonner';
 
-type Task = { id: string; title: string; description: string | null; priority: 'low'|'medium'|'high';
-  status: 'pending'|'in_progress'|'completed'; due_date: string | null; assigned_to: string | null;
-  profiles?: { full_name: string } };
+type Priority = 'low' | 'medium' | 'high';
+type TaskStatus = 'pending' | 'in_progress' | 'completed';
+
+type Task = {
+  id: string; title: string; description: string | null; priority: Priority;
+  status: TaskStatus; due_date: string | null; assigned_to: string | null;
+  is_target: boolean; target_month: string | null; target_count: number | null; progress_count: number;
+  profiles?: { full_name: string };
+};
 type Emp = { id: string; full_name: string };
 
-const priorityVariant: Record<string, 'destructive'|'default'|'secondary'> = { high: 'destructive', medium: 'default', low: 'secondary' };
+const priorityVariant: Record<string, 'destructive' | 'default' | 'secondary'> = {
+  high: 'destructive', medium: 'default', low: 'secondary',
+};
+
+function monthInputValue(d: Date) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
 
 export default function AdminTasks() {
   const { user } = useAuth();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [employees, setEmployees] = useState<Emp[]>([]);
   const [loading, setLoading] = useState(true);
-  const [open, setOpen] = useState(false);
+
+  // task dialog
+  const [taskOpen, setTaskOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
-
   const [title, setTitle] = useState(''); const [desc, setDesc] = useState('');
-  const [priority, setPriority] = useState<Task['priority']>('medium');
+  const [priority, setPriority] = useState<Priority>('medium');
   const [dueDate, setDueDate] = useState(''); const [assignee, setAssignee] = useState<string>('');
+
+  // target dialog
+  const [tgtOpen, setTgtOpen] = useState(false);
+  const [tgtTitle, setTgtTitle] = useState('');
+  const [tgtMonth, setTgtMonth] = useState(monthInputValue(new Date()));
+  const [tgtCount, setTgtCount] = useState('');
+  const [tgtAssignee, setTgtAssignee] = useState('');
 
   const load = useCallback(async () => {
     const [t, p] = await Promise.all([
@@ -44,25 +66,57 @@ export default function AdminTasks() {
       ...task,
       profiles: task.assigned_to ? profMap.get(task.assigned_to) : undefined,
     }));
-    setTasks(tasksWithNames as Task[]); setEmployees((p.data as Emp[]) ?? []); setLoading(false);
+    setTasks(tasksWithNames as Task[]);
+    setEmployees((p.data as Emp[]) ?? []);
+    setLoading(false);
   }, []);
 
   useEffect(() => { load(); }, [load]);
 
-  async function create(e: React.FormEvent) {
+  const regular = useMemo(() => tasks.filter((t) => !t.is_target), [tasks]);
+  const targets = useMemo(() => tasks.filter((t) => t.is_target), [tasks]);
+
+  async function createTask(e: React.FormEvent) {
     e.preventDefault();
     if (!user || !user.companyId || !title.trim() || !assignee) return;
     setSubmitting(true);
     const { error } = await supabase.from('tasks').insert({
       title: title.trim(), description: desc.trim() || null, priority, status: 'pending',
       due_date: dueDate || null, assigned_to: assignee, assigned_by: user.id,
-      company_id: user.companyId,
+      company_id: user.companyId, is_target: false,
     });
     setSubmitting(false);
     if (error) return toast.error(error.message);
     toast.success('Task created');
     setTitle(''); setDesc(''); setPriority('medium'); setDueDate(''); setAssignee('');
-    setOpen(false); load();
+    setTaskOpen(false); load();
+  }
+
+  async function createTarget(e: React.FormEvent) {
+    e.preventDefault();
+    if (!user?.companyId || !tgtTitle.trim() || !tgtAssignee) return;
+    const count = Number(tgtCount);
+    if (!count || count < 1) return toast.error('Enter a valid target count');
+    setSubmitting(true);
+    const { error } = await supabase.from('tasks').insert({
+      title: tgtTitle.trim(),
+      description: null,
+      priority: 'medium',
+      status: 'pending',
+      due_date: null,
+      assigned_to: tgtAssignee,
+      assigned_by: user.id,
+      company_id: user.companyId,
+      is_target: true,
+      target_month: `${tgtMonth}-01`,
+      target_count: count,
+      progress_count: 0,
+    });
+    setSubmitting(false);
+    if (error) return toast.error(error.message);
+    toast.success('Target task created');
+    setTgtTitle(''); setTgtCount(''); setTgtAssignee('');
+    setTgtOpen(false); load();
   }
 
   async function remove(id: string) {
@@ -70,71 +124,146 @@ export default function AdminTasks() {
     const { error } = await supabase.from('tasks').delete().eq('id', id);
     setBusyId(null);
     if (error) return toast.error(error.message);
-    toast.success('Task deleted'); load();
+    toast.success('Deleted'); load();
+  }
+
+  function TaskRow({ t }: { t: Task }) {
+    return (
+      <div className="flex items-start justify-between gap-4 p-4 rounded-xl bg-muted/30">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2 mb-1 flex-wrap">
+            <h4 className="font-semibold">{t.title}</h4>
+            <Badge variant={priorityVariant[t.priority]}>{t.priority}</Badge>
+            <StatusBadge status={t.status === 'in_progress' ? 'In Progress' : t.status === 'completed' ? 'Completed' : 'Pending'} />
+          </div>
+          {t.description && <p className="text-sm text-muted-foreground mb-1">{t.description}</p>}
+          <p className="text-xs text-muted-foreground">
+            Assigned to <span className="font-medium text-foreground">{t.profiles?.full_name ?? 'Unassigned'}</span> · Due {t.due_date ?? '—'}
+          </p>
+        </div>
+        <Button size="sm" variant="ghost" disabled={busyId === t.id} onClick={() => remove(t.id)} className="text-destructive hover:text-destructive">
+          {busyId === t.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+        </Button>
+      </div>
+    );
+  }
+
+  function TargetRow({ t }: { t: Task }) {
+    const total = t.target_count ?? 0;
+    const done = t.progress_count ?? 0;
+    const pct = total ? Math.min(100, Math.round((done / total) * 100)) : 0;
+    const monthLabel = t.target_month
+      ? new Date(t.target_month).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+      : '—';
+    return (
+      <div className="p-4 rounded-xl bg-muted/30 space-y-2">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <Target className="h-4 w-4 text-primary" />
+              <h4 className="font-semibold">{t.title}</h4>
+              <Badge variant="secondary">{monthLabel}</Badge>
+              <StatusBadge status={t.status === 'in_progress' ? 'In Progress' : t.status === 'completed' ? 'Completed' : 'Pending'} />
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {t.profiles?.full_name ?? 'Unassigned'} · <strong className="text-foreground">{done}/{total}</strong>
+            </p>
+          </div>
+          <Button size="sm" variant="ghost" disabled={busyId === t.id} onClick={() => remove(t.id)} className="text-destructive hover:text-destructive">
+            {busyId === t.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+          </Button>
+        </div>
+        <Progress value={pct} className="h-2" />
+      </div>
+    );
   }
 
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
           <div>
             <h1 className="text-2xl font-heading font-bold">Tasks</h1>
-            <p className="text-muted-foreground">Assign and track tasks across your team</p>
+            <p className="text-muted-foreground">Assign one-off tasks or monthly targets</p>
           </div>
-          <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild><Button><Plus className="h-4 w-4 mr-2" />New Task</Button></DialogTrigger>
-            <DialogContent>
-              <DialogHeader><DialogTitle>Create Task</DialogTitle></DialogHeader>
-              <form onSubmit={create} className="space-y-4">
-                <div className="space-y-2"><Label>Title</Label><Input required value={title} onChange={(e) => setTitle(e.target.value)} maxLength={200} /></div>
-                <div className="space-y-2"><Label>Description</Label><Textarea value={desc} onChange={(e) => setDesc(e.target.value)} rows={3} maxLength={1000} /></div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-2"><Label>Priority</Label>
-                    <Select value={priority} onValueChange={(v) => setPriority(v as Task['priority'])}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent><SelectItem value="low">Low</SelectItem><SelectItem value="medium">Medium</SelectItem><SelectItem value="high">High</SelectItem></SelectContent>
+          <div className="flex gap-2">
+            <Dialog open={tgtOpen} onOpenChange={setTgtOpen}>
+              <DialogTrigger asChild><Button variant="outline"><Target className="h-4 w-4 mr-2" />New Monthly Target</Button></DialogTrigger>
+              <DialogContent>
+                <DialogHeader><DialogTitle>Create Monthly Target Task</DialogTitle></DialogHeader>
+                <form onSubmit={createTarget} className="space-y-4">
+                  <div className="space-y-2"><Label>Title</Label>
+                    <Input required value={tgtTitle} onChange={(e) => setTgtTitle(e.target.value)} maxLength={200} placeholder="e.g. Cold-call 100 leads" />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-2"><Label>Month</Label>
+                      <Input type="month" value={tgtMonth} onChange={(e) => setTgtMonth(e.target.value)} />
+                    </div>
+                    <div className="space-y-2"><Label>Target count</Label>
+                      <Input type="number" min={1} value={tgtCount} onChange={(e) => setTgtCount(e.target.value)} placeholder="e.g. 100" required />
+                    </div>
+                  </div>
+                  <div className="space-y-2"><Label>Assign to</Label>
+                    <Select value={tgtAssignee} onValueChange={setTgtAssignee} required>
+                      <SelectTrigger><SelectValue placeholder="Select employee" /></SelectTrigger>
+                      <SelectContent>{employees.map((e) => <SelectItem key={e.id} value={e.id}>{e.full_name}</SelectItem>)}</SelectContent>
                     </Select>
                   </div>
-                  <div className="space-y-2"><Label>Due Date</Label><Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} /></div>
-                </div>
-                <div className="space-y-2"><Label>Assign to</Label>
-                  <Select value={assignee} onValueChange={setAssignee} required>
-                    <SelectTrigger><SelectValue placeholder="Select employee" /></SelectTrigger>
-                    <SelectContent>{employees.map((e) => <SelectItem key={e.id} value={e.id}>{e.full_name}</SelectItem>)}</SelectContent>
-                  </Select>
-                </div>
-                <Button type="submit" className="w-full" disabled={submitting}>
-                  {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Create Task'}
-                </Button>
-              </form>
-            </DialogContent>
-          </Dialog>
-        </div>
-        <Card className="p-6">
-          {loading ? (
-            <div className="text-center py-12"><Loader2 className="h-6 w-6 animate-spin text-primary mx-auto" /></div>
-          ) : tasks.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-12">No tasks yet. Create the first one.</p>
-          ) : (
-            <div className="space-y-3">
-              {tasks.map((t) => (
-                <div key={t.id} className="flex items-start justify-between gap-4 p-4 rounded-xl bg-muted/30">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2 mb-1 flex-wrap">
-                      <h4 className="font-semibold">{t.title}</h4>
-                      <Badge variant={priorityVariant[t.priority]}>{t.priority}</Badge>
-                      <StatusBadge status={t.status === 'in_progress' ? 'In Progress' : t.status === 'completed' ? 'Completed' : 'Pending'} />
-                    </div>
-                    {t.description && <p className="text-sm text-muted-foreground mb-1">{t.description}</p>}
-                    <p className="text-xs text-muted-foreground">Assigned to <span className="font-medium text-foreground">{t.profiles?.full_name ?? 'Unassigned'}</span> · Due {t.due_date ?? '—'}</p>
-                  </div>
-                  <Button size="sm" variant="ghost" disabled={busyId === t.id} onClick={() => remove(t.id)} className="text-destructive hover:text-destructive">
-                    {busyId === t.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                  <Button type="submit" className="w-full" disabled={submitting}>
+                    {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Create Target'}
                   </Button>
-                </div>
-              ))}
-            </div>
-          )}
+                </form>
+              </DialogContent>
+            </Dialog>
+
+            <Dialog open={taskOpen} onOpenChange={setTaskOpen}>
+              <DialogTrigger asChild><Button><Plus className="h-4 w-4 mr-2" />New Task</Button></DialogTrigger>
+              <DialogContent>
+                <DialogHeader><DialogTitle>Create Task</DialogTitle></DialogHeader>
+                <form onSubmit={createTask} className="space-y-4">
+                  <div className="space-y-2"><Label>Title</Label><Input required value={title} onChange={(e) => setTitle(e.target.value)} maxLength={200} /></div>
+                  <div className="space-y-2"><Label>Description</Label><Textarea value={desc} onChange={(e) => setDesc(e.target.value)} rows={3} maxLength={1000} /></div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-2"><Label>Priority</Label>
+                      <Select value={priority} onValueChange={(v) => setPriority(v as Priority)}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent><SelectItem value="low">Low</SelectItem><SelectItem value="medium">Medium</SelectItem><SelectItem value="high">High</SelectItem></SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2"><Label>Due Date</Label><Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} /></div>
+                  </div>
+                  <div className="space-y-2"><Label>Assign to</Label>
+                    <Select value={assignee} onValueChange={setAssignee} required>
+                      <SelectTrigger><SelectValue placeholder="Select employee" /></SelectTrigger>
+                      <SelectContent>{employees.map((e) => <SelectItem key={e.id} value={e.id}>{e.full_name}</SelectItem>)}</SelectContent>
+                    </Select>
+                  </div>
+                  <Button type="submit" className="w-full" disabled={submitting}>
+                    {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Create Task'}
+                  </Button>
+                </form>
+              </DialogContent>
+            </Dialog>
+          </div>
+        </div>
+
+        <Card className="p-6">
+          <Tabs defaultValue="tasks">
+            <TabsList>
+              <TabsTrigger value="tasks">Tasks ({regular.length})</TabsTrigger>
+              <TabsTrigger value="targets">Monthly Targets ({targets.length})</TabsTrigger>
+            </TabsList>
+            <TabsContent value="tasks" className="mt-4">
+              {loading ? <div className="text-center py-12"><Loader2 className="h-6 w-6 animate-spin text-primary mx-auto" /></div>
+                : regular.length === 0 ? <p className="text-sm text-muted-foreground text-center py-12">No tasks yet.</p>
+                : <div className="space-y-3">{regular.map((t) => <TaskRow key={t.id} t={t} />)}</div>}
+            </TabsContent>
+            <TabsContent value="targets" className="mt-4">
+              {loading ? <div className="text-center py-12"><Loader2 className="h-6 w-6 animate-spin text-primary mx-auto" /></div>
+                : targets.length === 0 ? <p className="text-sm text-muted-foreground text-center py-12">No monthly targets yet.</p>
+                : <div className="space-y-3">{targets.map((t) => <TargetRow key={t.id} t={t} />)}</div>}
+            </TabsContent>
+          </Tabs>
         </Card>
       </div>
     </DashboardLayout>

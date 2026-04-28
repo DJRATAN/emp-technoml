@@ -14,6 +14,7 @@ export interface CompanySettings {
   annual_leave_quota: number;
   sick_leave_quota: number;
   casual_leave_quota: number;
+  leave_approval_sla_hours: number;
 }
 
 export function useCompanySettings() {
