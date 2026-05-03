@@ -11,6 +11,7 @@ import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { useCompanySettings } from '@/hooks/useCompanySettings';
 import { EmployeeIdCard } from '@/components/EmployeeIdCard';
+import { BirthdaysCard } from '@/components/BirthdaysCard';
 
 export default function EmployeeDashboard() {
   const { user } = useAuth();
@@ -55,7 +56,10 @@ export default function EmployeeDashboard() {
           <h1 className="text-2xl font-heading font-bold">Welcome back, {user?.name?.split(' ')[0]} 👋</h1>
           <p className="text-muted-foreground">Here's your day at a glance</p>
         </div>
-        <EmployeeIdCard />
+        <div className="grid gap-4 lg:grid-cols-3">
+          <div className="lg:col-span-2"><EmployeeIdCard /></div>
+          <BirthdaysCard />
+        </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <StatCard label="Today's Attendance" value={todayAtt ? (todayAtt.status === 'late' ? 'Late' : 'Present') : 'Not marked'} icon={Clock} description={todayAtt?.check_in ? `Checked in at ${formatTime(todayAtt.check_in)}` : 'Mark your attendance'} />
           <StatCard label="Total Tasks" value={loading ? '…' : taskCounts.total} icon={CheckSquare} description={`${taskCounts.inProgress} in progress`} />

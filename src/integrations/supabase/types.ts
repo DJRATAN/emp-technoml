@@ -14,6 +14,36 @@ export type Database = {
   }
   public: {
     Tables: {
+      approval_chains: {
+        Row: {
+          approver_user_id: string
+          company_id: string
+          created_at: string
+          id: string
+          leave_type: string
+          role_label: string
+          step_order: number
+        }
+        Insert: {
+          approver_user_id: string
+          company_id: string
+          created_at?: string
+          id?: string
+          leave_type?: string
+          role_label: string
+          step_order: number
+        }
+        Update: {
+          approver_user_id?: string
+          company_id?: string
+          created_at?: string
+          id?: string
+          leave_type?: string
+          role_label?: string
+          step_order?: number
+        }
+        Relationships: []
+      }
       attendance: {
         Row: {
           check_in: string | null
@@ -73,6 +103,81 @@ export type Database = {
           },
         ]
       }
+      chat_channel_members: {
+        Row: {
+          channel_id: string
+          joined_at: string
+          user_id: string
+        }
+        Insert: {
+          channel_id: string
+          joined_at?: string
+          user_id: string
+        }
+        Update: {
+          channel_id?: string
+          joined_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      chat_channels: {
+        Row: {
+          company_id: string
+          created_at: string
+          created_by: string
+          id: string
+          name: string
+          type: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          created_by: string
+          id?: string
+          name: string
+          type?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          created_by?: string
+          id?: string
+          name?: string
+          type?: string
+        }
+        Relationships: []
+      }
+      chat_messages: {
+        Row: {
+          attachment_url: string | null
+          author_id: string
+          body: string
+          channel_id: string
+          company_id: string
+          created_at: string
+          id: string
+        }
+        Insert: {
+          attachment_url?: string | null
+          author_id: string
+          body: string
+          channel_id: string
+          company_id: string
+          created_at?: string
+          id?: string
+        }
+        Update: {
+          attachment_url?: string | null
+          author_id?: string
+          body?: string
+          channel_id?: string
+          company_id?: string
+          created_at?: string
+          id?: string
+        }
+        Relationships: []
+      }
       companies: {
         Row: {
           created_at: string
@@ -99,6 +204,42 @@ export type Database = {
           owner_id?: string | null
           slug?: string
           status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      company_features: {
+        Row: {
+          birthdays_enabled: boolean
+          chat_enabled: boolean
+          company_id: string
+          helpdesk_enabled: boolean
+          ip_whitelist_enabled: boolean
+          kudos_enabled: boolean
+          mock_gps_detection_enabled: boolean
+          multi_level_approvals_enabled: boolean
+          updated_at: string
+        }
+        Insert: {
+          birthdays_enabled?: boolean
+          chat_enabled?: boolean
+          company_id: string
+          helpdesk_enabled?: boolean
+          ip_whitelist_enabled?: boolean
+          kudos_enabled?: boolean
+          mock_gps_detection_enabled?: boolean
+          multi_level_approvals_enabled?: boolean
+          updated_at?: string
+        }
+        Update: {
+          birthdays_enabled?: boolean
+          chat_enabled?: boolean
+          company_id?: string
+          helpdesk_enabled?: boolean
+          ip_whitelist_enabled?: boolean
+          kudos_enabled?: boolean
+          mock_gps_detection_enabled?: boolean
+          multi_level_approvals_enabled?: boolean
           updated_at?: string
         }
         Relationships: []
@@ -158,6 +299,228 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      employee_documents: {
+        Row: {
+          company_id: string
+          created_at: string
+          document_type: string
+          employee_id: string
+          file_name: string
+          id: string
+          notes: string | null
+          storage_path: string
+          updated_at: string
+          uploaded_by: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          document_type?: string
+          employee_id: string
+          file_name: string
+          id?: string
+          notes?: string | null
+          storage_path: string
+          updated_at?: string
+          uploaded_by: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          document_type?: string
+          employee_id?: string
+          file_name?: string
+          id?: string
+          notes?: string | null
+          storage_path?: string
+          updated_at?: string
+          uploaded_by?: string
+        }
+        Relationships: []
+      }
+      helpdesk_attachments: {
+        Row: {
+          company_id: string
+          created_at: string
+          file_name: string
+          id: string
+          mime_type: string | null
+          size_bytes: number | null
+          storage_path: string
+          ticket_id: string
+          uploaded_by: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          file_name: string
+          id?: string
+          mime_type?: string | null
+          size_bytes?: number | null
+          storage_path: string
+          ticket_id: string
+          uploaded_by: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          file_name?: string
+          id?: string
+          mime_type?: string | null
+          size_bytes?: number | null
+          storage_path?: string
+          ticket_id?: string
+          uploaded_by?: string
+        }
+        Relationships: []
+      }
+      helpdesk_comments: {
+        Row: {
+          author_id: string
+          body: string
+          company_id: string
+          created_at: string
+          id: string
+          ticket_id: string
+        }
+        Insert: {
+          author_id: string
+          body: string
+          company_id: string
+          created_at?: string
+          id?: string
+          ticket_id: string
+        }
+        Update: {
+          author_id?: string
+          body?: string
+          company_id?: string
+          created_at?: string
+          id?: string
+          ticket_id?: string
+        }
+        Relationships: []
+      }
+      helpdesk_tickets: {
+        Row: {
+          assignee_id: string | null
+          category: string
+          company_id: string
+          created_at: string
+          created_by: string
+          description: string | null
+          due_at: string
+          id: string
+          priority: string
+          resolved_at: string | null
+          sla_hours: number
+          status: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          assignee_id?: string | null
+          category?: string
+          company_id: string
+          created_at?: string
+          created_by: string
+          description?: string | null
+          due_at?: string
+          id?: string
+          priority?: string
+          resolved_at?: string | null
+          sla_hours?: number
+          status?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          assignee_id?: string | null
+          category?: string
+          company_id?: string
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          due_at?: string
+          id?: string
+          priority?: string
+          resolved_at?: string | null
+          sla_hours?: number
+          status?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      kudos: {
+        Row: {
+          badge: string | null
+          company_id: string
+          created_at: string
+          from_user: string
+          id: string
+          message: string
+          to_user: string
+        }
+        Insert: {
+          badge?: string | null
+          company_id: string
+          created_at?: string
+          from_user: string
+          id?: string
+          message: string
+          to_user: string
+        }
+        Update: {
+          badge?: string | null
+          company_id?: string
+          created_at?: string
+          from_user?: string
+          id?: string
+          message?: string
+          to_user?: string
+        }
+        Relationships: []
+      }
+      leave_approval_steps: {
+        Row: {
+          approver_user_id: string
+          company_id: string
+          created_at: string
+          decided_at: string | null
+          id: string
+          leave_request_id: string
+          notes: string | null
+          role_label: string
+          status: string
+          step_order: number
+        }
+        Insert: {
+          approver_user_id: string
+          company_id: string
+          created_at?: string
+          decided_at?: string | null
+          id?: string
+          leave_request_id: string
+          notes?: string | null
+          role_label: string
+          status?: string
+          step_order: number
+        }
+        Update: {
+          approver_user_id?: string
+          company_id?: string
+          created_at?: string
+          decided_at?: string | null
+          id?: string
+          leave_request_id?: string
+          notes?: string | null
+          role_label?: string
+          status?: string
+          step_order?: number
+        }
+        Relationships: []
       }
       leave_requests: {
         Row: {
@@ -496,6 +859,10 @@ export type Database = {
         Returns: boolean
       }
       is_approved: { Args: { _user_id: string }; Returns: boolean }
+      is_channel_member: {
+        Args: { _channel: string; _user: string }
+        Returns: boolean
+      }
       is_super_admin: { Args: { _user_id: string }; Returns: boolean }
       user_company: { Args: { _user_id: string }; Returns: string }
     }

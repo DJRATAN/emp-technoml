@@ -5,7 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { supabase } from '@/integrations/supabase/client';
-import { Search, Check, X, Loader2, UserMinus } from 'lucide-react';
+import { Search, Check, X, Loader2, UserMinus, Eye } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
 type Profile = {
@@ -18,6 +19,7 @@ export default function AdminEmployees() {
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState('');
   const [busyId, setBusyId] = useState<string | null>(null);
+  const navigate = useNavigate();
 
   const load = useCallback(async () => {
     const { data } = await supabase.from('profiles').select('id, full_name, email, phone, department, job_title, status').order('created_at', { ascending: false });
@@ -100,15 +102,20 @@ export default function AdminEmployees() {
                       <td className="py-3 pr-4">{p.job_title ?? '—'}</td>
                       <td className="py-3 pr-4"><StatusBadge status={p.status === 'approved' ? 'Active' : p.status === 'pending' ? 'Pending' : p.status === 'suspended' ? 'Suspended' : 'Rejected'} /></td>
                       <td className="py-3">
-                        {p.status === 'approved' ? (
-                          <Button size="sm" variant="outline" disabled={busyId === p.id} onClick={() => changeStatus(p.id, 'suspended')}>
-                            <UserMinus className="h-3 w-3 mr-1" />Suspend
+                        <div className="flex gap-2">
+                          <Button size="sm" variant="outline" onClick={() => navigate(`/admin/employees/${p.id}`)}>
+                            <Eye className="h-3 w-3 mr-1" />View
                           </Button>
-                        ) : p.status === 'suspended' || p.status === 'rejected' ? (
-                          <Button size="sm" disabled={busyId === p.id} onClick={() => changeStatus(p.id, 'approved')}>
-                            <Check className="h-3 w-3 mr-1" />Reactivate
-                          </Button>
-                        ) : null}
+                          {p.status === 'approved' ? (
+                            <Button size="sm" variant="outline" disabled={busyId === p.id} onClick={() => changeStatus(p.id, 'suspended')}>
+                              <UserMinus className="h-3 w-3 mr-1" />Suspend
+                            </Button>
+                          ) : p.status === 'suspended' || p.status === 'rejected' ? (
+                            <Button size="sm" disabled={busyId === p.id} onClick={() => changeStatus(p.id, 'approved')}>
+                              <Check className="h-3 w-3 mr-1" />Reactivate
+                            </Button>
+                          ) : null}
+                        </div>
                       </td>
                     </tr>
                   ))}

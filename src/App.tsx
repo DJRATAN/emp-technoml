@@ -5,6 +5,8 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth, UserRole } from "@/contexts/AuthContext";
 import LoginPage from "./pages/LoginPage";
+import LandingPage from "./pages/LandingPage";
+import PricingPage from "./pages/PricingPage";
 import PendingApproval from "./pages/PendingApproval";
 import EmployeeDashboard from "./pages/employee/EmployeeDashboard";
 import EmployeeAttendance from "./pages/employee/EmployeeAttendance";
@@ -13,10 +15,18 @@ import EmployeeLeave from "./pages/employee/EmployeeLeave";
 import EmployeePerformance from "./pages/employee/EmployeePerformance";
 import EmployeeProfile from "./pages/employee/EmployeeProfile";
 import EmployeeTargets from "./pages/employee/EmployeeTargets";
+import EmployeeKudos from "./pages/employee/EmployeeKudos";
+import EmployeeChat from "./pages/employee/EmployeeChat";
+import EmployeeHelpdesk from "./pages/employee/EmployeeHelpdesk";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminTargets from "./pages/admin/AdminTargets";
+import AdminHelpdesk from "./pages/admin/AdminHelpdesk";
+import AdminFeatures from "./pages/admin/AdminFeatures";
+import AdminApprovalChain from "./pages/admin/AdminApprovalChain";
 import AdminEmployees from "./pages/admin/AdminEmployees";
+import AdminEmployeeDetail from "./pages/admin/AdminEmployeeDetail";
 import AdminAttendance from "./pages/admin/AdminAttendance";
+import AdminLiveMap from "./pages/admin/AdminLiveMap";
 import AdminTasks from "./pages/admin/AdminTasks";
 import AdminLeave from "./pages/admin/AdminLeave";
 import AdminReports from "./pages/admin/AdminReports";
@@ -70,7 +80,9 @@ function AppRoutes() {
 
   return (
     <Routes>
-      <Route path="/" element={homeRedirect ? <Navigate to={homeRedirect} replace /> : <LoginPage />} />
+      <Route path="/" element={homeRedirect ? <Navigate to={homeRedirect} replace /> : <LandingPage />} />
+      <Route path="/login" element={homeRedirect ? <Navigate to={homeRedirect} replace /> : <LoginPage />} />
+      <Route path="/pricing" element={<PricingPage />} />
       <Route path="/pending" element={<PendingApproval />} />
 
       <Route path="/super-admin" element={<ProtectedRoute allow={['super_admin']}><SuperAdminCompanies /></ProtectedRoute>} />
@@ -82,15 +94,23 @@ function AppRoutes() {
       <Route path="/employee/performance" element={<ProtectedRoute allow={['employee']}><EmployeePerformance /></ProtectedRoute>} />
       <Route path="/employee/profile" element={<ProtectedRoute allow={['employee']}><EmployeeProfile /></ProtectedRoute>} />
       <Route path="/employee/targets" element={<ProtectedRoute allow={['employee']}><EmployeeTargets /></ProtectedRoute>} />
+      <Route path="/employee/kudos" element={<ProtectedRoute allow={['employee']}><EmployeeKudos /></ProtectedRoute>} />
+      <Route path="/employee/chat" element={<ProtectedRoute allow={['employee']}><EmployeeChat /></ProtectedRoute>} />
+      <Route path="/employee/helpdesk" element={<ProtectedRoute allow={['employee']}><EmployeeHelpdesk /></ProtectedRoute>} />
 
       <Route path="/admin" element={<ProtectedRoute allow={['admin', 'super_admin']}><AdminDashboard /></ProtectedRoute>} />
       <Route path="/admin/targets" element={<ProtectedRoute allow={['admin', 'super_admin']}><AdminTargets /></ProtectedRoute>} />
       <Route path="/admin/employees" element={<ProtectedRoute allow={['admin', 'super_admin']}><AdminEmployees /></ProtectedRoute>} />
+      <Route path="/admin/employees/:id" element={<ProtectedRoute allow={['admin', 'super_admin']}><AdminEmployeeDetail /></ProtectedRoute>} />
       <Route path="/admin/attendance" element={<ProtectedRoute allow={['admin', 'super_admin']}><AdminAttendance /></ProtectedRoute>} />
+      <Route path="/admin/live-map" element={<ProtectedRoute allow={['admin', 'super_admin']}><AdminLiveMap /></ProtectedRoute>} />
       <Route path="/admin/tasks" element={<ProtectedRoute allow={['admin', 'super_admin']}><AdminTasks /></ProtectedRoute>} />
       <Route path="/admin/leave" element={<ProtectedRoute allow={['admin', 'super_admin']}><AdminLeave /></ProtectedRoute>} />
       <Route path="/admin/reports" element={<ProtectedRoute allow={['admin', 'super_admin']}><AdminReports /></ProtectedRoute>} />
       <Route path="/admin/settings" element={<ProtectedRoute allow={['admin', 'super_admin']}><AdminSettings /></ProtectedRoute>} />
+      <Route path="/admin/helpdesk" element={<ProtectedRoute allow={['admin', 'super_admin']}><AdminHelpdesk /></ProtectedRoute>} />
+      <Route path="/admin/features" element={<ProtectedRoute allow={['admin', 'super_admin']}><AdminFeatures /></ProtectedRoute>} />
+      <Route path="/admin/approval-chain" element={<ProtectedRoute allow={['admin', 'super_admin']}><AdminApprovalChain /></ProtectedRoute>} />
 
       <Route path="*" element={<NotFound />} />
     </Routes>

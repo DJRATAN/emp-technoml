@@ -2,7 +2,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Clock, CheckSquare, CalendarDays, TrendingUp,
-  User, Users, FileBarChart, Settings, LogOut, Building2, Globe, Target
+  User, Users, FileBarChart, Settings, LogOut, Building2, Globe, Target, MapPin,
+  Award, MessageSquare, LifeBuoy, ToggleLeft, GitBranch
 } from 'lucide-react';
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent,
@@ -11,38 +12,48 @@ import {
 } from '@/components/ui/sidebar';
 import { NavLink } from '@/components/NavLink';
 import { Button } from '@/components/ui/button';
-
-const employeeMenu = [
-  { title: 'Dashboard', url: '/employee', icon: LayoutDashboard },
-  { title: 'Attendance', url: '/employee/attendance', icon: Clock },
-  { title: 'Tasks', url: '/employee/tasks', icon: CheckSquare },
-  { title: 'My Targets', url: '/employee/targets', icon: Target },
-  { title: 'Leave', url: '/employee/leave', icon: CalendarDays },
-  { title: 'Performance', url: '/employee/performance', icon: TrendingUp },
-  { title: 'Profile', url: '/employee/profile', icon: User },
-];
-
-const adminMenu = [
-  { title: 'Dashboard', url: '/admin', icon: LayoutDashboard },
-  { title: 'Employees', url: '/admin/employees', icon: Users },
-  { title: 'Attendance', url: '/admin/attendance', icon: Clock },
-  { title: 'Tasks', url: '/admin/tasks', icon: CheckSquare },
-  { title: 'Targets', url: '/admin/targets', icon: Target },
-  { title: 'Leave Requests', url: '/admin/leave', icon: CalendarDays },
-  { title: 'Reports', url: '/admin/reports', icon: FileBarChart },
-  { title: 'Settings', url: '/admin/settings', icon: Settings },
-];
-
-const superAdminMenu = [
-  { title: 'Companies', url: '/super-admin', icon: Globe },
-  { title: 'My Company', url: '/admin', icon: Building2 },
-];
+import { useCompanyFeatures } from '@/hooks/useCompanyFeatures';
 
 export function AppSidebar() {
   const { user, logout } = useAuth();
+  const { features } = useCompanyFeatures();
   const { state } = useSidebar();
   const collapsed = state === 'collapsed';
   const navigate = useNavigate();
+
+  const employeeMenu = [
+    { title: 'Dashboard', url: '/employee', icon: LayoutDashboard, show: true },
+    { title: 'Attendance', url: '/employee/attendance', icon: Clock, show: true },
+    { title: 'Tasks', url: '/employee/tasks', icon: CheckSquare, show: true },
+    { title: 'My Targets', url: '/employee/targets', icon: Target, show: true },
+    { title: 'Leave', url: '/employee/leave', icon: CalendarDays, show: true },
+    { title: 'Performance', url: '/employee/performance', icon: TrendingUp, show: true },
+    { title: 'Kudos', url: '/employee/kudos', icon: Award, show: features?.kudos_enabled !== false },
+    { title: 'Chat', url: '/employee/chat', icon: MessageSquare, show: features?.chat_enabled !== false },
+    { title: 'Helpdesk', url: '/employee/helpdesk', icon: LifeBuoy, show: features?.helpdesk_enabled !== false },
+    { title: 'Profile', url: '/employee/profile', icon: User, show: true },
+  ].filter(i => i.show);
+
+  const adminMenu = [
+    { title: 'Dashboard', url: '/admin', icon: LayoutDashboard, show: true },
+    { title: 'Employees', url: '/admin/employees', icon: Users, show: true },
+    { title: 'Attendance', url: '/admin/attendance', icon: Clock, show: true },
+    { title: 'Live Map', url: '/admin/live-map', icon: MapPin, show: true },
+    { title: 'Tasks', url: '/admin/tasks', icon: CheckSquare, show: true },
+    { title: 'Targets', url: '/admin/targets', icon: Target, show: true },
+    { title: 'Leave Requests', url: '/admin/leave', icon: CalendarDays, show: true },
+    { title: 'Helpdesk', url: '/admin/helpdesk', icon: LifeBuoy, show: features?.helpdesk_enabled !== false },
+    { title: 'Approval Chain', url: '/admin/approval-chain', icon: GitBranch, show: true },
+    { title: 'Reports', url: '/admin/reports', icon: FileBarChart, show: true },
+    { title: 'Features', url: '/admin/features', icon: ToggleLeft, show: true },
+    { title: 'Settings', url: '/admin/settings', icon: Settings, show: true },
+  ].filter(i => i.show);
+
+  const superAdminMenu = [
+    { title: 'Companies', url: '/super-admin', icon: Globe },
+    { title: 'My Company', url: '/admin', icon: Building2 },
+  ];
+
   const menu = user?.role === 'super_admin' ? superAdminMenu
     : user?.role === 'admin' ? adminMenu : employeeMenu;
 
@@ -56,7 +67,7 @@ export function AppSidebar() {
       <SidebarContent>
         <SidebarGroup>
           <SidebarGroupLabel className="gap-2">
-            <Building2 className="h-4 w-4 text-primary" />
+            <img src="/logo.png" alt="TechnoML" className="h-6 w-6" />
             {!collapsed && <span className="font-heading font-semibold text-primary">TechnoML</span>}
           </SidebarGroupLabel>
           <SidebarGroupContent>
