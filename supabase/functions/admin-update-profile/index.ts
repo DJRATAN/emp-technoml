@@ -1,24 +1,25 @@
 
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4?target=deno"
+import { createClient } from "@supabase/supabase-js"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
 Deno.serve(async (req) => {
-  // Always handle OPTIONS preflight
+  console.log(`Request received: ${req.method} ${req.url}`);
+  
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+    return new Response(null, { headers: corsHeaders })
   }
 
   try {
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     
     if (!supabaseUrl || !supabaseServiceKey) {
-      throw new Error('Server environment variables missing')
+      console.error("Missing environment variables: SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY");
+      throw new Error('Server configuration error');
     }
 
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey)
@@ -30,51 +31,39 @@ Deno.serve(async (req) => {
     if (callerError || !caller) throw new Error('Invalid token')
 
     const body = await req.json()
-    console.log("Request Body:", JSON.stringify(body));
+    const { userId, action, payload } = body
+    if (!userId || !action) throw new Error('Missing userId or action')
 
-    // Support both legacy and new payload formats
-    const userId = body.targetUserId || body.userId || body.payload?.userId
-    const action = body.action || (body.newPassword ? 'password' : null)
-    
-    if (!userId) throw new Error('Target User ID is required')
-    if (!action) throw new Error('Action is required')
-
-    // 1. Authorization
+    // 1. Authorization Check
+    // Check if caller is Super-Admin
     const { data: callerRoles } = await supabaseAdmin.from('user_roles').select('role').eq('user_id', caller.id)
     const isSuperAdmin = callerRoles?.some(r => r.role === 'super_admin')
 
     if (!isSuperAdmin) {
+      // Check if caller is Owner or Admin in the same company
       const { data: targetProfile } = await supabaseAdmin.from('profiles').select('company_id').eq('id', userId).single()
       const { data: callerProfile } = await supabaseAdmin.from('profiles').select('company_id').eq('id', caller.id).single()
       
       if (!targetProfile || !callerProfile || targetProfile.company_id !== callerProfile.company_id) {
-        throw new Error('Forbidden: Tenant isolation violation')
+        throw new Error('Forbidden: Cross-tenant access denied')
       }
 
       const isAdmin = callerRoles?.some(r => r.role === 'admin')
-      const { data: company } = await supabaseAdmin.from('companies').select('owner_id').eq('id', targetProfile.company_id).single()
-      const isOwner = company?.owner_id === caller.id
-
-      if (!isAdmin && !isOwner) throw new Error('Forbidden: Insufficient permissions')
+      if (!isAdmin) throw new Error('Forbidden: Admin access required')
     }
 
-    // 2. Actions
+    // 2. Perform Action
     if (action === 'password') {
-      const pwd = body.newPassword || body.payload?.password
-      if (!pwd) throw new Error('New password is required')
-      
-      const { error } = await supabaseAdmin.auth.admin.updateUserById(userId, { password: pwd })
+      const { error } = await supabaseAdmin.auth.admin.updateUserById(userId, { password: payload.password })
       if (error) throw error
-      
-      return new Response(JSON.stringify({ success: true }), { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      })
-    }
-
+      return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    } 
+    
     if (action === 'avatar') {
-      const base64Data = body.payload.file.split(',')[1] || body.payload.file
+      // payload.file is base64 string
+      const base64Data = payload.file.split(',')[1] || payload.file
       const binaryData = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0))
-      const ext = body.payload.ext || 'jpg'
+      const ext = payload.ext || 'jpg'
       const path = `${userId}/avatar_${Date.now()}.${ext}`
 
       const { error: upErr } = await supabaseAdmin.storage.from('avatars').upload(path, binaryData, { 
@@ -86,42 +75,37 @@ Deno.serve(async (req) => {
       const { error: dbErr } = await supabaseAdmin.from('profiles').update({ avatar_url: path }).eq('id', userId)
       if (dbErr) throw dbErr
 
-      return new Response(JSON.stringify({ success: true, path }), { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      })
+      return new Response(JSON.stringify({ success: true, path }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 
     if (action === 'document') {
-      const base64Data = body.payload.file.split(',')[1] || body.payload.file
+      const base64Data = payload.file.split(',')[1] || payload.file
       const binaryData = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0))
-      const path = `${userId}/${Date.now()}_${body.payload.fileName}`
+      const path = `${userId}/${Date.now()}_${payload.fileName}`
 
       const { error: upErr } = await supabaseAdmin.storage.from('employee-documents').upload(path, binaryData, { 
-        contentType: body.payload.contentType || 'application/octet-stream'
+        contentType: payload.contentType || 'application/octet-stream'
       })
       if (upErr) throw upErr
 
       const { error: dbErr } = await supabaseAdmin.from('employee_documents').insert({
         employee_id: userId,
-        company_id: body.payload.companyId,
-        document_type: body.payload.docType || 'other',
-        file_name: body.payload.fileName,
+        company_id: payload.companyId,
+        document_type: payload.docType || 'other',
+        file_name: payload.fileName,
         storage_path: path,
         uploaded_by: caller.id
       })
       if (dbErr) throw dbErr
 
-      return new Response(JSON.stringify({ success: true, path }), { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      })
+      return new Response(JSON.stringify({ success: true, path }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 
-    throw new Error('Action not implemented')
+    throw new Error('Invalid action')
 
   } catch (error: any) {
-    console.error("Function error:", error.message);
     return new Response(JSON.stringify({ success: false, error: error.message }), { 
-      status: 200, // Return 200 with success:false to avoid CORS preflight issues on errors
+      status: 400, 
       headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
     })
   }

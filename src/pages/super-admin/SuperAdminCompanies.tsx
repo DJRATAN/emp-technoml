@@ -102,8 +102,12 @@ export default function SuperAdminCompanies() {
     if (!resettingUserId || resetPassword.length < 6) return toast.error('Password must be at least 6 characters');
     setIsResetting(true);
     try {
-      const { data, error } = await supabase.functions.invoke('update-user-password', {
-        body: { targetUserId: resettingUserId, newPassword: resetPassword },
+      const { data, error } = await supabase.functions.invoke('bootstrap-admin', {
+        body: { 
+          userId: resettingUserId, 
+          newPassword: resetPassword,
+          action: 'password'
+        },
       });
       if (error || !data?.success) throw new Error(data?.error || error?.message || 'Failed to reset password');
       toast.success('Password updated successfully');

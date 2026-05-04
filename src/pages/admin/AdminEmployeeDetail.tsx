@@ -14,7 +14,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import {
   ArrowLeft, Loader2, Upload, Trash2, Download, User, Mail, Building2,
   Phone, Briefcase, Calendar, MapPin, ShieldAlert, FileText, Camera,
-  KeyRound, Power, PowerOff, Shield, Lock, Snowflake, AlertTriangle
+  KeyRound, Power, PowerOff, Shield, Lock, Snowflake, AlertTriangle, Eye, EyeOff
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -73,25 +73,38 @@ export default function AdminEmployeeDetail() {
   const [newPassword, setNewPassword] = useState('');
   const [resettingPassword, setResettingPassword] = useState(false);
   const [busyAction, setBusyAction] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
 
-  async function handlePasswordReset(e: React.FormEvent) {
+  const handlePasswordReset = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (newPassword.length < 6) return toast.error('Password must be at least 6 characters');
+    if (!newPassword || newPassword.length < 6) return toast.error('Password must be at least 6 characters');
     setResettingPassword(true);
+
     try {
-      const { data, error } = await supabase.functions.invoke('update-user-password', {
-        body: { targetUserId: id, newPassword },
+      console.log('Initiating password reset for user ID:', id);
+      const { data, error } = await supabase.functions.invoke('bootstrap-admin', {
+        body: { 
+          userId: id, 
+          action: 'password',
+          newPassword: newPassword.trim()
+        }
       });
-      if (error || !data?.success) throw new Error(data?.error || error?.message || 'Failed to reset password');
-      toast.success('Password updated successfully');
-      setNewPassword('');
+
+      if (error || !data.success) {
+        console.error('Password reset failure:', error || data?.error);
+        throw new Error(error?.message || data?.error || 'Failed to reset password');
+      }
+
+      toast.success(`Password for ${data.email} updated successfully. They can now log in.`);
       setResetDialogOpen(false);
+      setNewPassword('');
     } catch (err: any) {
       toast.error(err.message);
     } finally {
       setResettingPassword(false);
     }
-  }
+  };
+
 
   const loadDocs = useCallback(async () => {
     if (!id) return;
@@ -243,33 +256,57 @@ export default function AdminEmployeeDetail() {
     if (meta.profile_frozen) return toast.error('Profile is frozen — cannot change photo');
     if (file.size > 5 * 1024 * 1024) return toast.error('Max 5MB');
     setUploading(true);
-    const ext = file.name.split('.').pop() ?? 'jpg';
-    const path = `${id}/avatar.${ext}`;
-    const { error: upErr } = await supabase.storage.from('avatars').upload(path, file, { upsert: true });
-    if (upErr) { setUploading(false); return toast.error(upErr.message); }
-    await supabase.from('profiles').update({ avatar_url: path }).eq('id', id);
-    update('avatar_url', path);
-    const { data: signed } = await supabase.storage.from('avatars').createSignedUrl(path, 3600);
-    setAvatarPreview(signed?.signedUrl ?? null);
-    setUploading(false);
-    toast.success('Profile photo updated — this will be used for face recognition');
+
+    try {
+      const ext = file.name.split('.').pop() ?? 'jpg';
+      const path = `${id}/avatar_${Date.now()}.${ext}`;
+
+      const { error: upErr } = await supabase.storage.from('avatars').upload(path, file, { upsert: true });
+      if (upErr) throw upErr;
+
+      const { error: dbErr } = await supabase.from('profiles').update({ avatar_url: path }).eq('id', id);
+      if (dbErr) throw dbErr;
+
+      update('avatar_url', path);
+      const { data: signed } = await supabase.storage.from('avatars').createSignedUrl(path, 3600);
+      setAvatarPreview(signed?.signedUrl ?? null);
+      toast.success('Profile photo updated');
+      setUploading(false);
+    } catch (err: any) {
+      console.error('Upload error:', err);
+      toast.error(err.message);
+      setUploading(false);
+    }
   }
 
   async function uploadDocument(file: File) {
     if (!id || !user) return;
     if (file.size > 10 * 1024 * 1024) return toast.error('Max 10MB');
     setUploadingDoc(true);
-    const path = `${id}/${Date.now()}-${file.name}`;
-    const { error: upErr } = await supabase.storage.from('employee-documents').upload(path, file);
-    if (upErr) { setUploadingDoc(false); return toast.error(upErr.message); }
-    const { error } = await supabase.from('employee_documents' as any).insert({
-      employee_id: id, company_id: user.companyId, document_type: docType,
-      file_name: file.name, storage_path: path, uploaded_by: user.id,
-    } as any);
-    setUploadingDoc(false);
-    if (error) return toast.error(error.message);
-    toast.success('Document uploaded');
-    loadDocs();
+
+    try {
+      const path = `${id}/${Date.now()}_${file.name}`;
+      const { error: upErr } = await supabase.storage.from('employee-documents').upload(path, file);
+      if (upErr) throw upErr;
+
+      const { error: dbErr } = await supabase.from('employee_documents' as any).insert({
+        employee_id: id,
+        company_id: user.companyId,
+        document_type: docType,
+        file_name: file.name,
+        storage_path: path,
+        uploaded_by: user.id
+      });
+      if (dbErr) throw dbErr;
+
+      toast.success('Document uploaded');
+      loadDocs();
+      setUploadingDoc(false);
+    } catch (err: any) {
+      console.error('Upload error:', err);
+      toast.error(err.message);
+      setUploadingDoc(false);
+    }
   }
 
   async function deleteDoc(doc: Doc) {
@@ -505,20 +542,33 @@ export default function AdminEmployeeDetail() {
                       <DialogTitle>Reset Password for {form.full_name}</DialogTitle>
                     </DialogHeader>
                     <form onSubmit={handlePasswordReset} className="space-y-4 pt-4">
-                      <div className="space-y-2">
-                        <Label>New Password (min 6 characters)</Label>
-                        <Input 
-                          type="password" 
-                          required 
-                          minLength={6} 
-                          value={newPassword} 
-                          onChange={(e) => setNewPassword(e.target.value)}
-                          placeholder="Enter new password"
-                        />
+                      <div className="space-y-3">
+                        <div className="relative">
+                          <Input 
+                            type={showPassword ? "text" : "password"} 
+                            placeholder="Enter new password" 
+                            value={newPassword}
+                            onChange={(e) => setNewPassword(e.target.value)}
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                            onClick={() => setShowPassword(!showPassword)}
+                          >
+                            {showPassword ? <EyeOff className="h-4 w-4 text-muted-foreground" /> : <Eye className="h-4 w-4 text-muted-foreground" />}
+                          </Button>
+                        </div>
+                        <Button 
+                          className="w-full" 
+                          onClick={handlePasswordReset}
+                          disabled={resettingPassword || !newPassword}
+                        >
+                          {resettingPassword ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <KeyRound className="h-4 w-4 mr-2" />}
+                          Update Password
+                        </Button>
                       </div>
-                      <Button type="submit" className="w-full" disabled={resettingPassword}>
-                        {resettingPassword ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : 'Update Password'}
-                      </Button>
                     </form>
                   </DialogContent>
                 </Dialog>
@@ -617,6 +667,44 @@ export default function AdminEmployeeDetail() {
               ))}
             </div>
           )}
+        </Card>
+
+        {/* Security Management */}
+        <Card className="p-6 border-warning/20 bg-warning/5">
+          <h3 className="font-heading font-semibold flex items-center gap-2 mb-1 text-warning-foreground">
+            <ShieldAlert className="h-4 w-4" /> Security Management
+          </h3>
+          <p className="text-sm text-muted-foreground mb-4">Directly update this user's password. They will be able to log in with the new password immediately.</p>
+
+          <div className="flex gap-2 max-w-md">
+            <div className="relative flex-1">
+              <Input 
+                type={showPassword ? "text" : "password"} 
+                placeholder="Enter new password" 
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                className="pr-10"
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                onClick={() => setShowPassword(!showPassword)}
+              >
+                {showPassword ? <EyeOff className="h-4 w-4 text-muted-foreground" /> : <Eye className="h-4 w-4 text-muted-foreground" />}
+              </Button>
+            </div>
+            <Button 
+              onClick={handlePasswordReset}
+              disabled={resettingPassword || !newPassword}
+              variant="warning"
+              className="whitespace-nowrap"
+            >
+              {resettingPassword ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <KeyRound className="h-4 w-4 mr-2" />}
+              Change Password
+            </Button>
+          </div>
         </Card>
       </div>
     </DashboardLayout>
