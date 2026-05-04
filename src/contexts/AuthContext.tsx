@@ -88,15 +88,39 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const login = useCallback(async (companySlug: string, email: string, password: string) => {
     const slug = companySlug.trim().toLowerCase();
-    // Look up company first (anon SELECT policy permits this)
     const { data: company } = await supabase.from('companies').select('id, status').eq('slug', slug).maybeSingle();
     if (!company) return { error: `Company "${slug}" not found. Check the company code.` };
     if (company.status !== 'active') return { error: 'This company account is not active. Contact support.' };
 
-    const { data: signInData, error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error || !signInData.user) return { error: error?.message ?? 'Login failed' };
+    // Check if account is locked
+    const { data: profileCheck } = await supabase.from('profiles')
+      .select('id, is_active, locked_until, failed_login_count')
+      .eq('email', email).eq('company_id', company.id).maybeSingle();
 
-    // Verify the signed-in user belongs to this company (or is super_admin)
+    if (profileCheck) {
+      if (!(profileCheck as any).is_active) return { error: 'Your account has been deactivated. Contact your admin.' };
+      const lockedUntil = (profileCheck as any).locked_until;
+      if (lockedUntil && new Date(lockedUntil) > new Date()) {
+        const mins = Math.ceil((new Date(lockedUntil).getTime() - Date.now()) / 60000);
+        return { error: `Account locked. Try again in ${mins} minute(s).` };
+      }
+    }
+
+    const { data: signInData, error } = await supabase.auth.signInWithPassword({ email, password });
+
+    if (error || !signInData.user) {
+      // Increment failed login count
+      if (profileCheck) {
+        const newCount = ((profileCheck as any).failed_login_count ?? 0) + 1;
+        const updates: any = { failed_login_count: newCount };
+        if (newCount >= 5) {
+          updates.locked_until = new Date(Date.now() + 30 * 60000).toISOString();
+        }
+        await supabase.from('profiles').update(updates).eq('id', (profileCheck as any).id);
+      }
+      return { error: error?.message ?? 'Login failed' };
+    }
+
     const u = await loadAppUser(signInData.user);
     if (!u) {
       await supabase.auth.signOut();
@@ -106,6 +130,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await supabase.auth.signOut();
       return { error: 'This account does not belong to this company.' };
     }
+
+    // Reset failed count on success & update last login
+    await supabase.from('profiles').update({
+      failed_login_count: 0, locked_until: null,
+      last_login_at: new Date().toISOString(),
+      last_login_device: navigator.userAgent,
+    } as any).eq('id', u.id);
+
+    // Log successful login
+    await supabase.from('login_logs' as any).insert({
+      user_id: u.id, company_id: u.companyId, email,
+      success: true, user_agent: navigator.userAgent,
+    } as any);
+
     return { error: null };
   }, []);
 

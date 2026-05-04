@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { User, Mail, Building2, Phone, Briefcase, Loader2, MapPin, Calendar, ShieldAlert, IdCard, FileText, Download } from 'lucide-react';
+import { ChangePasswordDialog } from '@/components/ChangePasswordDialog';
 
 type ProfileData = {
   full_name: string;
@@ -87,9 +88,12 @@ export default function EmployeeProfile() {
   return (
     <DashboardLayout>
       <div className="space-y-6 max-w-3xl">
-        <div>
-          <h1 className="text-2xl font-heading font-bold">My Profile</h1>
-          <p className="text-muted-foreground">Your profile is managed by your company admin</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-heading font-bold">My Profile</h1>
+            <p className="text-muted-foreground">Your profile is managed by your company admin</p>
+          </div>
+          <ChangePasswordDialog />
         </div>
 
         <Card className="p-6">

@@ -7,11 +7,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   ArrowLeft, Loader2, Upload, Trash2, Download, User, Mail, Building2,
-  Phone, Briefcase, Calendar, MapPin, ShieldAlert, FileText, Camera
+  Phone, Briefcase, Calendar, MapPin, ShieldAlert, FileText, Camera,
+  KeyRound, Power, PowerOff, Shield, Lock, Snowflake, AlertTriangle
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -21,7 +24,14 @@ type ProfileForm = {
   avatar_url: string; id_card_url: string;
 };
 
+type ProfileMeta = {
+  status: string; is_active: boolean; force_password_change: boolean;
+  profile_frozen: boolean; failed_login_count: number; locked_until: string | null;
+  last_login_at: string | null; last_login_device: string | null;
+};
+
 type Doc = { id: string; document_type: string; file_name: string; storage_path: string; notes: string | null; created_at: string };
+type LoginLog = { id: string; success: boolean; email: string; ip_address: string | null; user_agent: string | null; failure_reason: string | null; created_at: string };
 
 const DOC_TYPES = [
   { value: 'contract', label: 'Contract' },
@@ -39,6 +49,11 @@ export default function AdminEmployeeDetail() {
     full_name: '', phone: '', department: '', job_title: '',
     emergency_contact: '', address: '', date_of_birth: '', avatar_url: '', id_card_url: '',
   });
+  const [meta, setMeta] = useState<ProfileMeta>({
+    status: 'pending', is_active: true, force_password_change: false,
+    profile_frozen: false, failed_login_count: 0, locked_until: null,
+    last_login_at: null, last_login_device: null,
+  });
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -47,6 +62,11 @@ export default function AdminEmployeeDetail() {
   const [docs, setDocs] = useState<Doc[]>([]);
   const [docType, setDocType] = useState('other');
   const [uploadingDoc, setUploadingDoc] = useState(false);
+  const [loginLogs, setLoginLogs] = useState<LoginLog[]>([]);
+  const [logsLoading, setLogsLoading] = useState(false);
+  const [showLogs, setShowLogs] = useState(false);
+  const [resetDialogOpen, setResetDialogOpen] = useState(false);
+  const [busyAction, setBusyAction] = useState<string | null>(null);
 
   const loadDocs = useCallback(async () => {
     if (!id) return;
@@ -63,24 +83,34 @@ export default function AdminEmployeeDetail() {
     (async () => {
       const { data } = await supabase
         .from('profiles')
-        .select('full_name, email, phone, department, job_title, emergency_contact, address, date_of_birth, avatar_url, id_card_url')
+        .select('full_name, email, phone, department, job_title, emergency_contact, address, date_of_birth, avatar_url, id_card_url, status, is_active, force_password_change, profile_frozen, failed_login_count, locked_until, last_login_at, last_login_device')
         .eq('id', id)
         .maybeSingle();
       if (data) {
-        setEmail(data.email);
+        setEmail((data as any).email);
         setForm({
-          full_name: data.full_name ?? '',
-          phone: data.phone ?? '',
-          department: data.department ?? '',
-          job_title: data.job_title ?? '',
-          emergency_contact: data.emergency_contact ?? '',
-          address: data.address ?? '',
-          date_of_birth: data.date_of_birth ?? '',
-          avatar_url: data.avatar_url ?? '',
-          id_card_url: data.id_card_url ?? '',
+          full_name: (data as any).full_name ?? '',
+          phone: (data as any).phone ?? '',
+          department: (data as any).department ?? '',
+          job_title: (data as any).job_title ?? '',
+          emergency_contact: (data as any).emergency_contact ?? '',
+          address: (data as any).address ?? '',
+          date_of_birth: (data as any).date_of_birth ?? '',
+          avatar_url: (data as any).avatar_url ?? '',
+          id_card_url: (data as any).id_card_url ?? '',
         });
-        if (data.avatar_url) {
-          const { data: signed } = await supabase.storage.from('avatars').createSignedUrl(data.avatar_url, 3600);
+        setMeta({
+          status: (data as any).status ?? 'pending',
+          is_active: (data as any).is_active ?? true,
+          force_password_change: (data as any).force_password_change ?? false,
+          profile_frozen: (data as any).profile_frozen ?? false,
+          failed_login_count: (data as any).failed_login_count ?? 0,
+          locked_until: (data as any).locked_until ?? null,
+          last_login_at: (data as any).last_login_at ?? null,
+          last_login_device: (data as any).last_login_device ?? null,
+        });
+        if ((data as any).avatar_url) {
+          const { data: signed } = await supabase.storage.from('avatars').createSignedUrl((data as any).avatar_url, 3600);
           setAvatarPreview(signed?.signedUrl ?? null);
         }
       }
@@ -104,14 +134,78 @@ export default function AdminEmployeeDetail() {
       emergency_contact: form.emergency_contact?.trim() || null,
       address: form.address?.trim() || null,
       date_of_birth: form.date_of_birth || null,
-    }).eq('id', id);
+    } as any).eq('id', id);
     setSaving(false);
     if (error) return toast.error(error.message);
     toast.success('Profile updated');
   }
 
+  async function toggleActive() {
+    if (!id) return;
+    const newActive = !meta.is_active;
+    setBusyAction('toggle-active');
+    const updates: any = { is_active: newActive };
+    if (!newActive) updates.status = 'suspended';
+    else if (meta.status === 'suspended') updates.status = 'approved';
+    const { error } = await supabase.from('profiles').update(updates).eq('id', id);
+    setBusyAction(null);
+    if (error) return toast.error(error.message);
+    setMeta(m => ({ ...m, is_active: newActive, status: updates.status ?? m.status }));
+    toast.success(newActive ? 'Employee activated' : 'Employee deactivated');
+  }
+
+  async function toggleFreeze() {
+    if (!id) return;
+    setBusyAction('freeze');
+    const { error } = await supabase.from('profiles').update({ profile_frozen: !meta.profile_frozen } as any).eq('id', id);
+    setBusyAction(null);
+    if (error) return toast.error(error.message);
+    setMeta(m => ({ ...m, profile_frozen: !m.profile_frozen }));
+    toast.success(meta.profile_frozen ? 'Profile unfrozen' : 'Profile frozen — photo locked');
+  }
+
+  async function unlockAccount() {
+    if (!id) return;
+    setBusyAction('unlock');
+    const { error } = await supabase.from('profiles').update({ failed_login_count: 0, locked_until: null } as any).eq('id', id);
+    setBusyAction(null);
+    if (error) return toast.error(error.message);
+    setMeta(m => ({ ...m, failed_login_count: 0, locked_until: null }));
+    toast.success('Account unlocked');
+  }
+
+  async function sendPasswordReset() {
+    if (!email) return;
+    setBusyAction('reset-pwd');
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+    setBusyAction(null);
+    setResetDialogOpen(false);
+    if (error) return toast.error(error.message);
+    // Set force_password_change flag
+    await supabase.from('profiles').update({ force_password_change: true } as any).eq('id', id);
+    setMeta(m => ({ ...m, force_password_change: true }));
+    toast.success(`Password reset link sent to ${email}`);
+  }
+
+  async function loadLoginLogs() {
+    if (!id) return;
+    setLogsLoading(true);
+    const { data } = await supabase
+      .from('login_logs' as any)
+      .select('id, success, email, ip_address, user_agent, failure_reason, created_at')
+      .eq('user_id', id)
+      .order('created_at', { ascending: false })
+      .limit(50);
+    setLoginLogs((data as any) ?? []);
+    setLogsLoading(false);
+    setShowLogs(true);
+  }
+
   async function uploadAvatar(file: File) {
     if (!id) return;
+    if (meta.profile_frozen) return toast.error('Profile is frozen — cannot change photo');
     if (file.size > 5 * 1024 * 1024) return toast.error('Max 5MB');
     setUploading(true);
     const ext = file.name.split('.').pop() ?? 'jpg';
@@ -134,12 +228,8 @@ export default function AdminEmployeeDetail() {
     const { error: upErr } = await supabase.storage.from('employee-documents').upload(path, file);
     if (upErr) { setUploadingDoc(false); return toast.error(upErr.message); }
     const { error } = await supabase.from('employee_documents' as any).insert({
-      employee_id: id,
-      company_id: user.companyId,
-      document_type: docType,
-      file_name: file.name,
-      storage_path: path,
-      uploaded_by: user.id,
+      employee_id: id, company_id: user.companyId, document_type: docType,
+      file_name: file.name, storage_path: path, uploaded_by: user.id,
     } as any);
     setUploadingDoc(false);
     if (error) return toast.error(error.message);
@@ -163,6 +253,8 @@ export default function AdminEmployeeDetail() {
     return <DashboardLayout><div className="flex justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div></DashboardLayout>;
   }
 
+  const isLocked = meta.locked_until && new Date(meta.locked_until) > new Date();
+
   return (
     <DashboardLayout>
       <div className="space-y-6 max-w-3xl">
@@ -170,15 +262,111 @@ export default function AdminEmployeeDetail() {
           <Button variant="ghost" size="icon" onClick={() => navigate('/admin/employees')}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
-          <div>
+          <div className="flex-1">
             <h1 className="text-2xl font-heading font-bold">Employee Profile</h1>
-            <p className="text-muted-foreground">Edit profile, upload photo & manage documents</p>
+            <p className="text-muted-foreground">Edit profile, manage security & documents</p>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            {!meta.is_active && <Badge variant="destructive">Deactivated</Badge>}
+            {meta.profile_frozen && <Badge variant="secondary"><Snowflake className="h-3 w-3 mr-1" />Frozen</Badge>}
+            {meta.force_password_change && <Badge variant="outline" className="border-warning text-warning">Must Reset Password</Badge>}
+            {isLocked && <Badge variant="destructive"><Lock className="h-3 w-3 mr-1" />Locked</Badge>}
           </div>
         </div>
 
+        {/* Admin Actions Bar */}
+        <Card className="p-4">
+          <h3 className="font-heading font-semibold text-sm mb-3 flex items-center gap-2"><Shield className="h-4 w-4 text-primary" /> Admin Controls</h3>
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" variant={meta.is_active ? "destructive" : "default"} disabled={busyAction === 'toggle-active'} onClick={toggleActive}>
+              {busyAction === 'toggle-active' ? <Loader2 className="h-3 w-3 animate-spin" /> :
+                meta.is_active ? <><PowerOff className="h-3 w-3 mr-1" />Deactivate</> : <><Power className="h-3 w-3 mr-1" />Activate</>}
+            </Button>
+
+            <Dialog open={resetDialogOpen} onOpenChange={setResetDialogOpen}>
+              <DialogTrigger asChild>
+                <Button size="sm" variant="outline"><KeyRound className="h-3 w-3 mr-1" />Reset Password</Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-sm">
+                <DialogHeader><DialogTitle>Reset Employee Password</DialogTitle></DialogHeader>
+                <p className="text-sm text-muted-foreground">A password reset link will be sent to <strong>{email}</strong>. The employee will be required to change their password on next login.</p>
+                <div className="flex justify-end gap-2 mt-4">
+                  <Button variant="outline" onClick={() => setResetDialogOpen(false)}>Cancel</Button>
+                  <Button onClick={sendPasswordReset} disabled={busyAction === 'reset-pwd'}>
+                    {busyAction === 'reset-pwd' ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Send Reset Link'}
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+
+            <Button size="sm" variant={meta.profile_frozen ? "default" : "outline"} disabled={busyAction === 'freeze'} onClick={toggleFreeze}>
+              {busyAction === 'freeze' ? <Loader2 className="h-3 w-3 animate-spin" /> :
+                meta.profile_frozen ? <><Snowflake className="h-3 w-3 mr-1" />Unfreeze Profile</> : <><Snowflake className="h-3 w-3 mr-1" />Freeze Profile</>}
+            </Button>
+
+            {isLocked && (
+              <Button size="sm" variant="outline" disabled={busyAction === 'unlock'} onClick={unlockAccount}>
+                {busyAction === 'unlock' ? <Loader2 className="h-3 w-3 animate-spin" /> : <><Lock className="h-3 w-3 mr-1" />Unlock Account</>}
+              </Button>
+            )}
+
+            <Button size="sm" variant="outline" onClick={loadLoginLogs} disabled={logsLoading}>
+              {logsLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <><AlertTriangle className="h-3 w-3 mr-1" />Login Logs</>}
+            </Button>
+          </div>
+
+          {/* Account Info */}
+          <div className="mt-3 flex flex-wrap gap-4 text-xs text-muted-foreground">
+            <span>Failed attempts: <strong className={meta.failed_login_count >= 3 ? 'text-destructive' : ''}>{meta.failed_login_count}</strong></span>
+            {meta.last_login_at && <span>Last login: {new Date(meta.last_login_at).toLocaleString()}</span>}
+            {meta.last_login_device && <span>Device: {meta.last_login_device.substring(0, 50)}…</span>}
+          </div>
+        </Card>
+
+        {/* Login Logs */}
+        {showLogs && (
+          <Card className="p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-heading font-semibold text-sm flex items-center gap-2"><AlertTriangle className="h-4 w-4 text-primary" /> Login Logs (Last 50)</h3>
+              <Button size="sm" variant="ghost" onClick={() => setShowLogs(false)}>Close</Button>
+            </div>
+            {loginLogs.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">No login logs found</p>
+            ) : (
+              <div className="overflow-x-auto max-h-64 overflow-y-auto">
+                <table className="w-full text-xs">
+                  <thead><tr className="text-muted-foreground border-b">
+                    <th className="py-1.5 pr-3 text-left">Time</th>
+                    <th className="py-1.5 pr-3 text-left">Status</th>
+                    <th className="py-1.5 pr-3 text-left">IP</th>
+                    <th className="py-1.5 text-left">Reason</th>
+                  </tr></thead>
+                  <tbody>
+                    {loginLogs.map(log => (
+                      <tr key={log.id} className="border-b last:border-0">
+                        <td className="py-1.5 pr-3 whitespace-nowrap">{new Date(log.created_at).toLocaleString()}</td>
+                        <td className="py-1.5 pr-3">
+                          <Badge variant={log.success ? 'default' : 'destructive'} className="text-[10px]">
+                            {log.success ? 'Success' : 'Failed'}
+                          </Badge>
+                        </td>
+                        <td className="py-1.5 pr-3 font-mono">{log.ip_address ?? '—'}</td>
+                        <td className="py-1.5 text-muted-foreground">{log.failure_reason ?? '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Card>
+        )}
+
         {/* Profile Photo */}
         <Card className="p-6">
-          <h3 className="font-heading font-semibold flex items-center gap-2 mb-4"><Camera className="h-4 w-4 text-primary" /> Profile Photo (Face Recognition Base)</h3>
+          <h3 className="font-heading font-semibold flex items-center gap-2 mb-4">
+            <Camera className="h-4 w-4 text-primary" /> Profile Photo (Face Recognition Base)
+            {meta.profile_frozen && <Badge variant="secondary" className="text-[10px]"><Snowflake className="h-3 w-3 mr-1" />Frozen</Badge>}
+          </h3>
           <div className="flex items-center gap-6">
             {avatarPreview ? (
               <img src={avatarPreview} alt="Avatar" className="h-24 w-24 rounded-2xl object-cover border" />
@@ -188,10 +376,12 @@ export default function AdminEmployeeDetail() {
             <div>
               <input id="avatar-input" type="file" accept="image/*" className="hidden"
                 onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadAvatar(f); }} />
-              <Button variant="outline" disabled={uploading} onClick={() => document.getElementById('avatar-input')?.click()}>
+              <Button variant="outline" disabled={uploading || meta.profile_frozen} onClick={() => document.getElementById('avatar-input')?.click()}>
                 {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Upload className="h-4 w-4 mr-2" /> Upload Photo</>}
               </Button>
-              <p className="text-xs text-muted-foreground mt-2">This photo is the base image for AI face matching</p>
+              <p className="text-xs text-muted-foreground mt-2">
+                {meta.profile_frozen ? 'Photo is frozen — unfreeze to change' : 'This photo is the base image for AI face matching'}
+              </p>
             </div>
           </div>
         </Card>

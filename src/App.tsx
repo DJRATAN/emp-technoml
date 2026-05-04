@@ -7,6 +7,8 @@ import { AuthProvider, useAuth, UserRole } from "@/contexts/AuthContext";
 import LoginPage from "./pages/LoginPage";
 import LandingPage from "./pages/LandingPage";
 import PricingPage from "./pages/PricingPage";
+import ForgotPasswordPage from "./pages/ForgotPasswordPage";
+import ResetPasswordPage from "./pages/ResetPasswordPage";
 import PendingApproval from "./pages/PendingApproval";
 import EmployeeDashboard from "./pages/employee/EmployeeDashboard";
 import EmployeeAttendance from "./pages/employee/EmployeeAttendance";
@@ -83,6 +85,8 @@ function AppRoutes() {
       <Route path="/" element={homeRedirect ? <Navigate to={homeRedirect} replace /> : <LandingPage />} />
       <Route path="/login" element={homeRedirect ? <Navigate to={homeRedirect} replace /> : <LoginPage />} />
       <Route path="/pricing" element={<PricingPage />} />
+      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route path="/pending" element={<PendingApproval />} />
 
       <Route path="/super-admin" element={<ProtectedRoute allow={['super_admin']}><SuperAdminCompanies /></ProtectedRoute>} />

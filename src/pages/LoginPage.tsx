@@ -225,6 +225,11 @@ export default function LoginPage() {
                 {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : (mode === 'login' ? 'Sign In' : 'Create Account')}
               </Button>
 
+              {mode === 'login' && (
+                <div className="text-center">
+                  <a href="/forgot-password" className="text-sm text-primary hover:underline">Forgot password?</a>
+                </div>
+              )}
               <div className="text-center text-sm text-muted-foreground pt-1">
                 {mode === 'login' ? (
                   <>New employee at <strong>{selected?.name}</strong>?{' '}

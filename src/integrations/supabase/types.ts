@@ -662,6 +662,42 @@ export type Database = {
         }
         Relationships: []
       }
+      login_logs: {
+        Row: {
+          company_id: string | null
+          created_at: string
+          email: string
+          failure_reason: string | null
+          id: string
+          ip_address: string | null
+          success: boolean
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string
+          email: string
+          failure_reason?: string | null
+          id?: string
+          ip_address?: string | null
+          success?: boolean
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string
+          email?: string
+          failure_reason?: string | null
+          id?: string
+          ip_address?: string | null
+          success?: boolean
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       notifications: {
         Row: {
           body: string | null
@@ -708,11 +744,18 @@ export type Database = {
           department: string | null
           email: string
           emergency_contact: string | null
+          failed_login_count: number
+          force_password_change: boolean
           full_name: string
           id: string
           id_card_url: string | null
+          is_active: boolean
           job_title: string | null
+          last_login_at: string | null
+          last_login_device: string | null
+          locked_until: string | null
           phone: string | null
+          profile_frozen: boolean
           status: Database["public"]["Enums"]["account_status"]
           updated_at: string
         }
@@ -725,11 +768,18 @@ export type Database = {
           department?: string | null
           email: string
           emergency_contact?: string | null
+          failed_login_count?: number
+          force_password_change?: boolean
           full_name: string
           id: string
           id_card_url?: string | null
+          is_active?: boolean
           job_title?: string | null
+          last_login_at?: string | null
+          last_login_device?: string | null
+          locked_until?: string | null
           phone?: string | null
+          profile_frozen?: boolean
           status?: Database["public"]["Enums"]["account_status"]
           updated_at?: string
         }
@@ -742,11 +792,18 @@ export type Database = {
           department?: string | null
           email?: string
           emergency_contact?: string | null
+          failed_login_count?: number
+          force_password_change?: boolean
           full_name?: string
           id?: string
           id_card_url?: string | null
+          is_active?: boolean
           job_title?: string | null
+          last_login_at?: string | null
+          last_login_device?: string | null
+          locked_until?: string | null
           phone?: string | null
+          profile_frozen?: boolean
           status?: Database["public"]["Enums"]["account_status"]
           updated_at?: string
         }
