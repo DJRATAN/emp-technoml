@@ -92,7 +92,7 @@ Deno.serve(async (req) => {
     });
     if (pErr) throw new Error(`profile: ${pErr.message}`);
 
-    // 5. Assign admin role
+    // 5. Assign administrator role (Company Owner)
     const { error: rErr } = await admin.from('user_roles').insert({ user_id: ownerId, role: 'admin' });
     if (rErr) throw new Error(`role: ${rErr.message}`);
 

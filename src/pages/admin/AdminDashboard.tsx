@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { StatCard } from '@/components/ui/stat-card';
 import { Card } from '@/components/ui/card';
@@ -7,6 +8,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, LineChart, Line } from 'recharts';
 
 export default function AdminDashboard() {
+  const { user } = useAuth();
   const [stats, setStats] = useState({ total: 0, present: 0, pendingLeave: 0, activeTasks: 0 });
   const [trend, setTrend] = useState<any[]>([]);
   const [taskTrend, setTaskTrend] = useState<any[]>([]);
@@ -42,8 +44,10 @@ export default function AdminDashboard() {
     <DashboardLayout>
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-heading font-bold">Admin Dashboard</h1>
-          <p className="text-muted-foreground">Company-wide overview and insights</p>
+          <h1 className="text-2xl font-heading font-bold">
+            {user?.isOwner ? 'Administrator Dashboard' : 'Admin Dashboard'}
+          </h1>
+          <p className="text-muted-foreground">Welcome back, {user?.name.split(' ')[0]} 👋</p>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <StatCard label="Total Employees" value={stats.total} icon={Users} description="Approved accounts" />

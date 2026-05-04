@@ -55,8 +55,10 @@ export default function AdminEmployeeDetail() {
     last_login_at: null, last_login_device: null,
   });
   const [email, setEmail] = useState('');
+  const [role, setRole] = useState<UserRole>('employee');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [roleSaving, setRoleSaving] = useState(false);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [docs, setDocs] = useState<Doc[]>([]);
@@ -81,43 +83,53 @@ export default function AdminEmployeeDetail() {
   useEffect(() => {
     if (!id) return;
     (async () => {
-      const { data } = await supabase
-        .from('profiles')
-        .select('full_name, email, phone, department, job_title, emergency_contact, address, date_of_birth, avatar_url, id_card_url, status, is_active, force_password_change, profile_frozen, failed_login_count, locked_until, last_login_at, last_login_device')
-        .eq('id', id)
-        .maybeSingle();
-      if (data) {
-        setEmail((data as any).email);
+      const [{ data: pData }, { data: rData }] = await Promise.all([
+        supabase.from('profiles').select('*').eq('id', id).maybeSingle(),
+        supabase.from('user_roles').select('role').eq('user_id', id),
+      ]);
+      
+      if (pData) {
+        setEmail((pData as any).email);
         setForm({
-          full_name: (data as any).full_name ?? '',
-          phone: (data as any).phone ?? '',
-          department: (data as any).department ?? '',
-          job_title: (data as any).job_title ?? '',
-          emergency_contact: (data as any).emergency_contact ?? '',
-          address: (data as any).address ?? '',
-          date_of_birth: (data as any).date_of_birth ?? '',
-          avatar_url: (data as any).avatar_url ?? '',
-          id_card_url: (data as any).id_card_url ?? '',
+          full_name: (pData as any).full_name ?? '',
+          phone: (pData as any).phone ?? '',
+          department: (pData as any).department ?? '',
+          job_title: (pData as any).job_title ?? '',
+          emergency_contact: (pData as any).emergency_contact ?? '',
+          address: (pData as any).address ?? '',
+          date_of_birth: (pData as any).date_of_birth ?? '',
+          avatar_url: (pData as any).avatar_url ?? '',
+          id_card_url: (pData as any).id_card_url ?? '',
         });
         setMeta({
-          status: (data as any).status ?? 'pending',
-          is_active: (data as any).is_active ?? true,
-          force_password_change: (data as any).force_password_change ?? false,
-          profile_frozen: (data as any).profile_frozen ?? false,
-          failed_login_count: (data as any).failed_login_count ?? 0,
-          locked_until: (data as any).locked_until ?? null,
-          last_login_at: (data as any).last_login_at ?? null,
-          last_login_device: (data as any).last_login_device ?? null,
+          status: (pData as any).status ?? 'pending',
+          is_active: (pData as any).is_active ?? true,
+          force_password_change: (pData as any).force_password_change ?? false,
+          profile_frozen: (pData as any).profile_frozen ?? false,
+          failed_login_count: (pData as any).failed_login_count ?? 0,
+          locked_until: (pData as any).locked_until ?? null,
+          last_login_at: (pData as any).last_login_at ?? null,
+          last_login_device: (pData as any).last_login_device ?? null,
         });
-        if ((data as any).avatar_url) {
-          const { data: signed } = await supabase.storage.from('avatars').createSignedUrl((data as any).avatar_url, 3600);
+        if ((pData as any).avatar_url) {
+          const { data: signed } = await supabase.storage.from('avatars').createSignedUrl((pData as any).avatar_url, 3600);
           setAvatarPreview(signed?.signedUrl ?? null);
         }
       }
+
+      if (rData && rData.length > 0) {
+        const roles = rData.map(r => r.role);
+        if (roles.includes('super_admin')) setRole('super_admin');
+        else if (roles.includes('administrator')) setRole('administrator');
+        else if (roles.includes('admin')) setRole('admin');
+        else setRole('employee');
+      }
+
       await loadDocs();
       setLoading(false);
     })();
   }, [id, loadDocs]);
+
 
   function update<K extends keyof ProfileForm>(k: K, v: ProfileForm[K]) {
     setForm((f) => ({ ...f, [k]: v }));
@@ -247,6 +259,24 @@ export default function AdminEmployeeDetail() {
   async function downloadDoc(doc: Doc) {
     const { data } = await supabase.storage.from('employee-documents').createSignedUrl(doc.storage_path, 300);
     if (data?.signedUrl) window.open(data.signedUrl, '_blank');
+  }
+
+  async function updateRole(newRole: UserRole) {
+    if (!id) return;
+    setRoleSaving(true);
+    try {
+      // 1. Delete existing roles (this app assumes 1 role per user for simplicity)
+      await supabase.from('user_roles').delete().eq('user_id', id);
+      // 2. Insert new role
+      const { error } = await supabase.from('user_roles').insert({ user_id: id, role: newRole });
+      if (error) throw error;
+      setRole(newRole);
+      toast.success(`User role updated to ${newRole}`);
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setRoleSaving(false);
+    }
   }
 
   if (loading) {
@@ -385,6 +415,47 @@ export default function AdminEmployeeDetail() {
             </div>
           </div>
         </Card>
+
+        {/* Role Management */}
+        {(user?.role === 'super_admin' || user?.isOwner) && (
+          <Card className="p-6">
+            <h3 className="font-heading font-semibold flex items-center gap-2 mb-4">
+              <Shield className="h-4 w-4 text-primary" /> Role Management
+            </h3>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium flex items-center gap-2">
+                    Current Role: <Badge variant="outline" className="capitalize">{role.replace('_', ' ')}</Badge>
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {user?.role === 'super_admin' 
+                      ? 'Global Super Admin: You can assign any platform role.' 
+                      : 'Company Owner: You can promote staff to Admin or demote to Employee.'}
+                  </p>
+                </div>
+              </div>
+              <div className="flex gap-2 items-center">
+                <Select value={role} onValueChange={(v) => updateRole(v as UserRole)} disabled={roleSaving || (user?.id === id)}>
+                  <SelectTrigger className="w-56">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="employee">Employee</SelectItem>
+                    <SelectItem value="admin">Admin</SelectItem>
+                    {user?.role === 'super_admin' && <SelectItem value="super_admin">Super Admin (Platform)</SelectItem>}
+                  </SelectContent>
+                </Select>
+                {roleSaving && <Loader2 className="h-4 w-4 animate-spin" />}
+              </div>
+              {user?.id === id && (
+                <p className="text-[10px] text-warning flex items-center gap-1">
+                  <AlertTriangle className="h-3 w-3" /> You cannot change your own role.
+                </p>
+              )}
+            </div>
+          </Card>
+        )}
 
         {/* Editable Fields */}
         <Card className="p-6">

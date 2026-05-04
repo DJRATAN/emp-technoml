@@ -12,6 +12,7 @@ export interface AppUser {
   email: string;
   name: string;
   role: UserRole;
+  isOwner?: boolean;
   status: AccountStatus;
   companyId: string | null;
   company: AppCompany | null;
@@ -36,18 +37,42 @@ const AuthContext = createContext<AuthContextType | null>(null);
 
 async function loadAppUser(sbUser: SbUser): Promise<AppUser | null> {
   const [{ data: profile }, { data: roles }] = await Promise.all([
-    supabase.from('profiles').select('*, companies:company_id(id, name, slug)').eq('id', sbUser.id).maybeSingle(),
+    supabase.from('profiles').select('*, companies:company_id(id, name, slug, owner_id)').eq('id', sbUser.id).maybeSingle(),
     supabase.from('user_roles').select('role').eq('user_id', sbUser.id),
   ]);
-  if (!profile) return null;
+
   const roleSet = new Set((roles ?? []).map((r) => r.role));
-  const role: UserRole = roleSet.has('super_admin') ? 'super_admin' : roleSet.has('admin') ? 'admin' : 'employee';
-  const company = (profile as any).companies as AppCompany | null;
+  const role: UserRole = roleSet.has('super_admin') ? 'super_admin' 
+    : roleSet.has('admin') ? 'admin' 
+    : 'employee';
+
+
+  if (!profile) {
+    // If it's a super_admin but profile is missing, return a synthetic user
+    if (role === 'super_admin') {
+      return {
+        id: sbUser.id,
+        email: sbUser.email || '',
+        name: sbUser.user_metadata?.full_name || sbUser.email?.split('@')[0] || 'Super Admin',
+        role: 'super_admin',
+        status: 'approved',
+        companyId: null,
+        company: null,
+      };
+    }
+    return null;
+  }
+
+  const companyRaw = (profile as any).companies as any;
+  const company: AppCompany | null = companyRaw ? { id: companyRaw.id, name: companyRaw.name, slug: companyRaw.slug } : null;
+  const isOwner = companyRaw?.owner_id === sbUser.id;
+  
   return {
     id: sbUser.id,
     email: profile.email,
     name: profile.full_name,
     role,
+    isOwner,
     status: profile.status,
     companyId: profile.company_id,
     company,
@@ -92,10 +117,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!company) return { error: `Company "${slug}" not found. Check the company code.` };
     if (company.status !== 'active') return { error: 'This company account is not active. Contact support.' };
 
-    // Check if account is locked
+    // Check if account is locked (Search by email only first)
     const { data: profileCheck } = await supabase.from('profiles')
-      .select('id, is_active, locked_until, failed_login_count')
-      .eq('email', email).eq('company_id', company.id).maybeSingle();
+      .select('id, is_active, locked_until, failed_login_count, company_id')
+      .eq('email', email.trim()).maybeSingle();
 
     if (profileCheck) {
       if (!(profileCheck as any).is_active) return { error: 'Your account has been deactivated. Contact your admin.' };
@@ -106,7 +131,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     }
 
-    const { data: signInData, error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data: signInData, error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
 
     if (error || !signInData.user) {
       // Increment failed login count
@@ -126,26 +151,32 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await supabase.auth.signOut();
       return { error: 'Account not found.' };
     }
+
+    // Relaxed check: Allow super_admin regardless of company selection,
+    // but check company matching for other roles.
     if (u.role !== 'super_admin' && u.companyId !== company.id) {
       await supabase.auth.signOut();
       return { error: 'This account does not belong to this company.' };
     }
 
-    // Reset failed count on success & update last login
-    await supabase.from('profiles').update({
-      failed_login_count: 0, locked_until: null,
-      last_login_at: new Date().toISOString(),
-      last_login_device: navigator.userAgent,
-    } as any).eq('id', u.id);
+    // Reset failed count on success & update last login (if profile exists)
+    if (u.id) {
+      await supabase.from('profiles').update({
+        failed_login_count: 0, locked_until: null,
+        last_login_at: new Date().toISOString(),
+        last_login_device: navigator.userAgent,
+      } as any).eq('id', u.id);
+    }
 
     // Log successful login
     await supabase.from('login_logs' as any).insert({
-      user_id: u.id, company_id: u.companyId, email,
+      user_id: u.id, company_id: u.companyId, email: email.trim(),
       success: true, user_agent: navigator.userAgent,
     } as any);
 
     return { error: null };
   }, []);
+
 
   const logout = useCallback(async () => {
     await supabase.auth.signOut();

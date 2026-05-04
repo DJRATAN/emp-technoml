@@ -1,3 +1,4 @@
+import React, { useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
@@ -5,9 +6,26 @@ import { Building2, Clock, LogOut } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 export default function PendingApproval() {
-  const { user, logout } = useAuth();
+  const { user, logout, refreshUser } = useAuth();
   const navigate = useNavigate();
   const status = user?.status;
+
+  // Poll for status changes
+  useEffect(() => {
+    if (!user || status === 'approved') return;
+    const interval = setInterval(() => {
+      refreshUser();
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [user, status, refreshUser]);
+
+  // If approved, redirect immediately
+  useEffect(() => {
+    if (status === 'approved' && user) {
+      const home = user.role === 'super_admin' ? '/super-admin' : (user.role === 'admin' ? '/admin' : `/${user.role}`);
+      navigate(home);
+    }
+  }, [status, user, navigate]);
 
   const messages = {
     pending: { title: 'Awaiting Admin Approval', body: 'Your account has been created and is pending review by an administrator. You will be able to access the portal once approved.' },

@@ -61,9 +61,9 @@ function ProtectedRoute({ children, allow }: { children: React.ReactNode; allow:
   const { isAuthenticated, user, loading } = useAuth();
   if (loading) return <FullscreenLoader />;
   if (!isAuthenticated || !user) return <Navigate to="/" replace />;
-  if (user.role === 'employee' && user.status !== 'approved') return <Navigate to="/pending" replace />;
+  if (user.status !== 'approved' && user.role !== 'super_admin') return <Navigate to="/pending" replace />;
   if (!allow.includes(user.role)) {
-    const home = user.role === 'super_admin' ? '/super-admin' : `/${user.role}`;
+    const home = user.role === 'super_admin' ? '/super-admin' : (user.role === 'admin' ? '/admin' : `/${user.role}`);
     return <Navigate to={home} replace />;
   }
   return <>{children}</>;
@@ -77,7 +77,7 @@ function AppRoutes() {
   const homeRedirect = isAuthenticated && user
     ? (user.role === 'super_admin' ? '/super-admin'
         : user.role === 'employee' && user.status !== 'approved' ? '/pending'
-        : `/${user.role}`)
+        : (user.role === 'admin' ? '/admin' : `/${user.role}`))
     : null;
 
   return (
