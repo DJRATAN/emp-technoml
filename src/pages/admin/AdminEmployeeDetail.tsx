@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card } from '@/components/ui/card';
@@ -17,6 +17,8 @@ import {
   KeyRound, Power, PowerOff, Shield, Lock, Snowflake, AlertTriangle
 } from 'lucide-react';
 import { toast } from 'sonner';
+
+type UserRole = 'employee' | 'admin' | 'super_admin' | 'administrator';
 
 type ProfileForm = {
   full_name: string; phone: string; department: string; job_title: string;
@@ -68,7 +70,28 @@ export default function AdminEmployeeDetail() {
   const [logsLoading, setLogsLoading] = useState(false);
   const [showLogs, setShowLogs] = useState(false);
   const [resetDialogOpen, setResetDialogOpen] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [resettingPassword, setResettingPassword] = useState(false);
   const [busyAction, setBusyAction] = useState<string | null>(null);
+
+  async function handlePasswordReset(e: React.FormEvent) {
+    e.preventDefault();
+    if (newPassword.length < 6) return toast.error('Password must be at least 6 characters');
+    setResettingPassword(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('update-user-password', {
+        body: { targetUserId: id, newPassword },
+      });
+      if (error || !data?.success) throw new Error(data?.error || error?.message || 'Failed to reset password');
+      toast.success('Password updated successfully');
+      setNewPassword('');
+      setResetDialogOpen(false);
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setResettingPassword(false);
+    }
+  }
 
   const loadDocs = useCallback(async () => {
     if (!id) return;
@@ -453,6 +476,53 @@ export default function AdminEmployeeDetail() {
                   <AlertTriangle className="h-3 w-3" /> You cannot change your own role.
                 </p>
               )}
+            </div>
+          </Card>
+        )}
+
+        {/* Security Management */}
+        {(user?.role === 'super_admin' || user?.isOwner) && (
+          <Card className="p-6">
+            <h3 className="font-heading font-semibold flex items-center gap-2 mb-4">
+              <Lock className="h-4 w-4 text-primary" /> Security Management
+            </h3>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium">Reset User Password</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Directly update this user's password. They will be able to log in with the new password immediately.
+                  </p>
+                </div>
+                <Dialog open={resetDialogOpen} onOpenChange={setResetDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" size="sm" className="gap-2">
+                      <KeyRound className="h-4 w-4" /> Change Password
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Reset Password for {form.full_name}</DialogTitle>
+                    </DialogHeader>
+                    <form onSubmit={handlePasswordReset} className="space-y-4 pt-4">
+                      <div className="space-y-2">
+                        <Label>New Password (min 6 characters)</Label>
+                        <Input 
+                          type="password" 
+                          required 
+                          minLength={6} 
+                          value={newPassword} 
+                          onChange={(e) => setNewPassword(e.target.value)}
+                          placeholder="Enter new password"
+                        />
+                      </div>
+                      <Button type="submit" className="w-full" disabled={resettingPassword}>
+                        {resettingPassword ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : 'Update Password'}
+                      </Button>
+                    </form>
+                  </DialogContent>
+                </Dialog>
+              </div>
             </div>
           </Card>
         )}

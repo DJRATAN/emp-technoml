@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -41,6 +41,9 @@ export default function SuperAdminCompanies() {
   const [managingCompany, setManagingCompany] = useState<CompanyRow | null>(null);
   const [companyUsers, setCompanyUsers] = useState<any[]>([]);
   const [usersLoading, setUsersLoading] = useState(false);
+  const [resettingUserId, setResettingUserId] = useState<string | null>(null);
+  const [resetPassword, setResetPassword] = useState('');
+  const [isResetting, setIsResetting] = useState(false);
 
   const [pendingUsers, setPendingUsers] = useState<any[]>([]);
   const [pendingLoading, setPendingLoading] = useState(false);
@@ -93,6 +96,24 @@ export default function SuperAdminCompanies() {
     toast.success('Company owner updated');
     load(); // Refresh global list
     setUsersOpen(false);
+  }
+
+  async function handleUserPasswordReset() {
+    if (!resettingUserId || resetPassword.length < 6) return toast.error('Password must be at least 6 characters');
+    setIsResetting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('update-user-password', {
+        body: { targetUserId: resettingUserId, newPassword: resetPassword },
+      });
+      if (error || !data?.success) throw new Error(data?.error || error?.message || 'Failed to reset password');
+      toast.success('Password updated successfully');
+      setResettingUserId(null);
+      setResetPassword('');
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setIsResetting(false);
+    }
   }
 
   const loadPending = useCallback(async () => {
@@ -307,27 +328,49 @@ export default function SuperAdminCompanies() {
                           </p>
                           <p className="text-xs text-muted-foreground">{u.email} · {u.job_title}</p>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <Badge variant={u.role === 'admin' ? 'default' : 'outline'} className="capitalize">
-                            {u.role}
-                          </Badge>
-                          
-                          {!isOwner && (
-                            <Button size="sm" variant="ghost" className="h-8 text-xs text-amber-600 hover:text-amber-700 hover:bg-amber-50" onClick={() => makeOwner(u.id)}>
-                              <UserCheck className="h-3 w-3 mr-1" /> Make Owner
-                            </Button>
-                          )}
-                          
-                          {u.role === 'employee' ? (
-                            <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => promoteToAdmin(u.id)}>
-                              Promote to Admin
-                            </Button>
-                          ) : (
-                            !isOwner && (
-                              <Button size="sm" variant="ghost" className="h-8 text-xs text-destructive" onClick={() => demoteToEmployee(u.id)}>
-                                Demote to Employee
+                        <div className="flex flex-col items-end gap-2">
+                          <div className="flex items-center gap-2">
+                            <Badge variant={u.role === 'admin' ? 'default' : 'outline'} className="capitalize">
+                              {u.role}
+                            </Badge>
+                            
+                            {!isOwner && (
+                              <Button size="sm" variant="ghost" className="h-8 text-xs text-amber-600 hover:text-amber-700 hover:bg-amber-50" onClick={() => makeOwner(u.id)}>
+                                <UserCheck className="h-3 w-3 mr-1" /> Make Owner
                               </Button>
-                            )
+                            )}
+                            
+                            {u.role === 'employee' ? (
+                              <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => promoteToAdmin(u.id)}>
+                                Promote to Admin
+                              </Button>
+                            ) : (
+                              !isOwner && (
+                                <Button size="sm" variant="ghost" className="h-8 text-xs text-destructive" onClick={() => demoteToEmployee(u.id)}>
+                                  Demote to Employee
+                                </Button>
+                              )
+                            )}
+                            
+                            <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => setResettingUserId(resettingUserId === u.id ? null : u.id)}>
+                              <Lock className="h-3 w-3 mr-1" /> Reset
+                            </Button>
+                          </div>
+
+                          {resettingUserId === u.id && (
+                            <div className="flex items-center gap-2 mt-2 animate-in fade-in slide-in-from-top-1">
+                              <Input 
+                                size={1} 
+                                className="h-8 text-xs w-32" 
+                                placeholder="New password" 
+                                type="password"
+                                value={resetPassword}
+                                onChange={(e) => setResetPassword(e.target.value)}
+                              />
+                              <Button size="sm" className="h-8 text-xs" onClick={handleUserPasswordReset} disabled={isResetting}>
+                                {isResetting ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Update'}
+                              </Button>
+                            </div>
                           )}
                         </div>
                       </div>
