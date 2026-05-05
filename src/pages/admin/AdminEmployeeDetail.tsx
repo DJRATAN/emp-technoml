@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 
-type UserRole = 'employee' | 'admin' | 'super_admin' | 'administrator';
+type UserRole = 'employee' | 'admin' | 'super_admin';
 
 type ProfileForm = {
   full_name: string; phone: string; department: string; job_title: string;
@@ -156,7 +156,7 @@ export default function AdminEmployeeDetail() {
       if (rData && rData.length > 0) {
         const roles = rData.map(r => r.role);
         if (roles.includes('super_admin')) setRole('super_admin');
-        else if (roles.includes('administrator')) setRole('administrator');
+        else if (roles.includes('admin')) setRole('admin');
         else if (roles.includes('admin')) setRole('admin');
         else setRole('employee');
       }
@@ -328,7 +328,7 @@ export default function AdminEmployeeDetail() {
       // 1. Delete existing roles (this app assumes 1 role per user for simplicity)
       await supabase.from('user_roles').delete().eq('user_id', id);
       // 2. Insert new role
-      const { error } = await supabase.from('user_roles').insert({ user_id: id, role: newRole });
+      const { error } = await supabase.from('user_roles').insert({ user_id: id, role: newRole } as any);
       if (error) throw error;
       setRole(newRole);
       toast.success(`User role updated to ${newRole}`);
@@ -698,7 +698,7 @@ export default function AdminEmployeeDetail() {
             <Button 
               onClick={handlePasswordReset}
               disabled={resettingPassword || !newPassword}
-              variant="warning"
+              variant="destructive"
               className="whitespace-nowrap"
             >
               {resettingPassword ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <KeyRound className="h-4 w-4 mr-2" />}

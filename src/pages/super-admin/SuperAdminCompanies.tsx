@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, Plus, Building2, Users, Clock, Shield, UserCog, UserCheck } from 'lucide-react';
+import { Loader2, Plus, Building2, Users, Clock, Shield, UserCog, UserCheck, Lock } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface CompanyRow {

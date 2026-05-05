@@ -40,7 +40,8 @@ Deno.serve(async (req) => {
       await supabase.from('profiles').update({ 
         failed_login_count: 0, 
         locked_until: null,
-        is_active: true
+        is_active: true,
+        force_password_change: false
       } as any).eq('id', userId);
 
       return new Response(JSON.stringify({ 
