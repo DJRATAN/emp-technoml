@@ -58,6 +58,8 @@ export default function AdminEmployeeDetail() {
   });
   const [email, setEmail] = useState('');
   const [role, setRole] = useState<UserRole>('employee');
+  const [permissions, setPermissions] = useState<any>(null);
+  const [permSaving, setPermSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [roleSaving, setRoleSaving] = useState(false);
@@ -71,6 +73,7 @@ export default function AdminEmployeeDetail() {
   const [showLogs, setShowLogs] = useState(false);
   const [resetDialogOpen, setResetDialogOpen] = useState(false);
   const [newPassword, setNewPassword] = useState('');
+  const [uploadingIdCard, setUploadingIdCard] = useState(false);
   const [resettingPassword, setResettingPassword] = useState(false);
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
@@ -86,7 +89,9 @@ export default function AdminEmployeeDetail() {
         body: { 
           userId: id, 
           action: 'password',
-          newPassword: newPassword.trim()
+          newPassword: newPassword.trim(),
+          adminId: user?.id,
+          companyId: user?.companyId,
         }
       });
 
@@ -157,8 +162,23 @@ export default function AdminEmployeeDetail() {
         const roles = rData.map(r => r.role);
         if (roles.includes('super_admin')) setRole('super_admin');
         else if (roles.includes('admin')) setRole('admin');
-        else if (roles.includes('admin')) setRole('admin');
         else setRole('employee');
+      }
+
+      // Load granular permissions if user is an admin
+      if (id) {
+        const { data: pData } = await supabase.from('admin_permissions' as any).select('*').eq('user_id', id).maybeSingle();
+        if (pData) setPermissions(pData);
+        else if (rData && rData.some(r => r.role === 'admin')) {
+          // Initialize if they are an admin but have no permission record
+          setPermissions({
+            can_view_attendance: true,
+            can_view_payroll: false,
+            can_manage_tasks: true,
+            can_delete_employees: false,
+            can_manage_settings: false
+          });
+        }
       }
 
       await loadDocs();
@@ -301,11 +321,34 @@ export default function AdminEmployeeDetail() {
 
       toast.success('Document uploaded');
       loadDocs();
-      setUploadingDoc(false);
     } catch (err: any) {
-      console.error('Upload error:', err);
       toast.error(err.message);
+    } finally {
       setUploadingDoc(false);
+    }
+  }
+
+  async function uploadIdCard(file: File) {
+    if (!id) return;
+    if (file.size > 5 * 1024 * 1024) return toast.error('Max 5MB');
+    setUploadingIdCard(true);
+
+    try {
+      const ext = file.name.split('.').pop() ?? 'jpg';
+      const path = `${id}/id_card_${Date.now()}.${ext}`;
+
+      const { error: upErr } = await supabase.storage.from('id-cards' as any).upload(path, file, { upsert: true });
+      if (upErr) throw upErr;
+
+      const { error: dbErr } = await supabase.from('profiles').update({ id_card_url: path } as any).eq('id', id);
+      if (dbErr) throw dbErr;
+
+      update('id_card_url', path);
+      toast.success('ID Card updated successfully');
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setUploadingIdCard(false);
     }
   }
 
@@ -325,17 +368,50 @@ export default function AdminEmployeeDetail() {
     if (!id) return;
     setRoleSaving(true);
     try {
-      // 1. Delete existing roles (this app assumes 1 role per user for simplicity)
       await supabase.from('user_roles').delete().eq('user_id', id);
-      // 2. Insert new role
       const { error } = await supabase.from('user_roles').insert({ user_id: id, role: newRole } as any);
       if (error) throw error;
       setRole(newRole);
+      
+      // If promoting to admin, ensure they have a permissions record
+      if (newRole === 'admin') {
+        const { data: existing } = await supabase.from('admin_permissions' as any).select('id').eq('user_id', id).maybeSingle();
+        if (!existing) {
+          const { data: newPerms } = await supabase.from('admin_permissions' as any).insert({
+            user_id: id,
+            company_id: user?.companyId,
+            can_view_attendance: true,
+            can_manage_tasks: true
+          } as any).select().single();
+          setPermissions(newPerms);
+        }
+      } else {
+        setPermissions(null);
+      }
+
       toast.success(`User role updated to ${newRole}`);
     } catch (e: any) {
       toast.error(e.message);
     } finally {
       setRoleSaving(false);
+    }
+  }
+
+  async function savePermissions() {
+    if (!id || !permissions) return;
+    setPermSaving(true);
+    try {
+      const { error } = await supabase.from('admin_permissions' as any).upsert({
+        user_id: id,
+        company_id: user?.companyId,
+        ...permissions
+      }).eq('user_id', id);
+      if (error) throw error;
+      toast.success('Admin permissions updated');
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setPermSaving(false);
     }
   }
 
@@ -513,6 +589,95 @@ export default function AdminEmployeeDetail() {
                   <AlertTriangle className="h-3 w-3" /> You cannot change your own role.
                 </p>
               )}
+            </div>
+          </Card>
+        )}
+
+        {/* Permissions Management (only for Admins) */}
+        {(user?.role === 'super_admin' || user?.isOwner) && role === 'admin' && permissions && (
+          <Card className="p-6">
+            <h3 className="font-heading font-semibold flex items-center gap-2 mb-1 text-primary">
+              <ShieldAlert className="h-4 w-4" /> Granular Permissions
+            </h3>
+            <p className="text-xs text-muted-foreground mb-6">Define exactly what this Admin can access and manage.</p>
+            
+            <div className="space-y-4">
+              {[
+                { key: 'can_view_attendance', label: 'View Attendance Reports', desc: 'Allows access to company-wide attendance logs' },
+                { key: 'can_view_payroll', label: 'Access Payroll/Salary', desc: 'View and manage employee compensation data' },
+                { key: 'can_manage_tasks', label: 'Assign & Delete Tasks', desc: 'Control team workload and task distribution' },
+                { key: 'can_delete_employees', label: 'Delete Employees', desc: 'High-level destructive permission for profile management' },
+                { key: 'can_manage_settings', label: 'Edit Company Settings', desc: 'Modify geofence, working hours, and branding' },
+              ].map((p) => (
+                <div key={p.key} className="flex items-start justify-between p-3 rounded-lg border bg-muted/20">
+                  <div className="space-y-0.5">
+                    <Label className="text-sm cursor-pointer" onClick={() => setPermissions({ ...permissions, [p.key]: !permissions[p.key] })}>
+                      {p.label}
+                    </Label>
+                    <p className="text-[10px] text-muted-foreground">{p.desc}</p>
+                  </div>
+                  <div 
+                    onClick={() => setPermissions({ ...permissions, [p.key]: !permissions[p.key] })}
+                    className={`w-10 h-5 rounded-full cursor-pointer transition-colors relative ${permissions[p.key] ? 'bg-primary' : 'bg-muted-foreground/30'}`}
+                  >
+                    <div className={`absolute top-1 w-3 h-3 rounded-full bg-white transition-all ${permissions[p.key] ? 'right-1' : 'left-1'}`} / >
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <Button className="mt-6 w-full" onClick={savePermissions} disabled={permSaving}>
+              {permSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Shield className="h-4 w-4 mr-2" />}
+              Save Permissions
+            </Button>
+          </Card>
+        )}
+
+        {/* Work ID / ID Card */}
+        {(user?.role === 'super_admin' || user?.isOwner) && (
+          <Card className="p-6">
+            <h3 className="font-heading font-semibold flex items-center gap-2 mb-2">
+              <Camera className="h-4 w-4 text-primary" /> Work ID / ID Card
+            </h3>
+            <p className="text-xs text-muted-foreground mb-4">Official identification for employee access and verification.</p>
+            
+            <div className="flex flex-col sm:flex-row gap-6 items-start sm:items-center">
+              <div className="w-full sm:w-64 aspect-[3/2] rounded-xl border-2 border-dashed bg-muted flex items-center justify-center overflow-hidden relative group">
+                {form.id_card_url ? (
+                  <img 
+                    src={supabase.storage.from('id-cards' as any).getPublicUrl(form.id_card_url).data.publicUrl} 
+                    alt="ID Card" 
+                    className="object-contain h-full w-full"
+                  />
+                ) : (
+                  <div className="text-center p-4">
+                    <Camera className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+                    <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">No ID Uploaded</p>
+                  </div>
+                )}
+                {form.id_card_url && (
+                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                    <Button size="sm" variant="secondary" className="h-8" onClick={() => window.open(supabase.storage.from('id-cards' as any).getPublicUrl(form.id_card_url).data.publicUrl, '_blank')}>
+                      <Eye className="h-3 w-3 mr-1" /> View
+                    </Button>
+                  </div>
+                )}
+              </div>
+              
+              <div className="space-y-3">
+                <input 
+                  type="file" 
+                  id="id-card-up" 
+                  className="hidden" 
+                  accept="image/*" 
+                  onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadIdCard(f); }}
+                />
+                <Button variant="outline" onClick={() => document.getElementById('id-card-up')?.click()} disabled={uploadingIdCard}>
+                  {uploadingIdCard ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Upload className="h-4 w-4 mr-2" />}
+                  {form.id_card_url ? 'Replace ID Card' : 'Upload ID Card'}
+                </Button>
+                <p className="text-[10px] text-muted-foreground">Supports JPG, PNG. Max 5MB.</p>
+              </div>
             </div>
           </Card>
         )}

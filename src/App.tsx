@@ -19,10 +19,12 @@ import EmployeeProfile from "./pages/employee/EmployeeProfile";
 import EmployeeTargets from "./pages/employee/EmployeeTargets";
 import EmployeeKudos from "./pages/employee/EmployeeKudos";
 import EmployeeChat from "./pages/employee/EmployeeChat";
+import EmployeeInbox from "./pages/employee/EmployeeInbox";
 import EmployeeHelpdesk from "./pages/employee/EmployeeHelpdesk";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminTargets from "./pages/admin/AdminTargets";
 import AdminHelpdesk from "./pages/admin/AdminHelpdesk";
+import AdminCommunication from "./pages/admin/AdminCommunication";
 import AdminFeatures from "./pages/admin/AdminFeatures";
 import AdminApprovalChain from "./pages/admin/AdminApprovalChain";
 import AdminEmployees from "./pages/admin/AdminEmployees";
@@ -100,6 +102,7 @@ function AppRoutes() {
       <Route path="/employee/targets" element={<ProtectedRoute allow={['employee']}><EmployeeTargets /></ProtectedRoute>} />
       <Route path="/employee/kudos" element={<ProtectedRoute allow={['employee']}><EmployeeKudos /></ProtectedRoute>} />
       <Route path="/employee/chat" element={<ProtectedRoute allow={['employee']}><EmployeeChat /></ProtectedRoute>} />
+      <Route path="/employee/inbox" element={<ProtectedRoute allow={['employee']}><EmployeeInbox /></ProtectedRoute>} />
       <Route path="/employee/helpdesk" element={<ProtectedRoute allow={['employee']}><EmployeeHelpdesk /></ProtectedRoute>} />
 
       <Route path="/admin" element={<ProtectedRoute allow={['admin', 'super_admin']}><AdminDashboard /></ProtectedRoute>} />
@@ -113,6 +116,7 @@ function AppRoutes() {
       <Route path="/admin/reports" element={<ProtectedRoute allow={['admin', 'super_admin']}><AdminReports /></ProtectedRoute>} />
       <Route path="/admin/settings" element={<ProtectedRoute allow={['admin', 'super_admin']}><AdminSettings /></ProtectedRoute>} />
       <Route path="/admin/helpdesk" element={<ProtectedRoute allow={['admin', 'super_admin']}><AdminHelpdesk /></ProtectedRoute>} />
+      <Route path="/admin/communication" element={<ProtectedRoute allow={['admin', 'super_admin']}><AdminCommunication /></ProtectedRoute>} />
       <Route path="/admin/features" element={<ProtectedRoute allow={['admin', 'super_admin']}><AdminFeatures /></ProtectedRoute>} />
       <Route path="/admin/approval-chain" element={<ProtectedRoute allow={['admin', 'super_admin']}><AdminApprovalChain /></ProtectedRoute>} />
 

@@ -15,6 +15,9 @@ export interface CompanySettings {
   sick_leave_quota: number;
   casual_leave_quota: number;
   leave_approval_sla_hours: number;
+  face_recognition_sensitivity: number;
+  logo_url?: string | null;
+  theme_color?: string | null;
 }
 
 export function useCompanySettings() {
@@ -24,12 +27,22 @@ export function useCompanySettings() {
 
   const fetchSettings = useCallback(async () => {
     if (!user?.companyId) { setLoading(false); return; }
-    const { data } = await supabase.from('company_settings').select('*').eq('company_id', user.companyId).maybeSingle();
-    if (data) setSettings({
-      ...data,
-      office_latitude: Number(data.office_latitude),
-      office_longitude: Number(data.office_longitude),
-    } as CompanySettings);
+    
+    // Fetch both settings and company branding
+    const [settingsRes, companyRes] = await Promise.all([
+      supabase.from('company_settings').select('*').eq('company_id', user.companyId).maybeSingle(),
+      supabase.from('companies').select('logo_url, theme_color' as any).eq('id', user.companyId).maybeSingle()
+    ]);
+
+    if (settingsRes.data) {
+      setSettings({
+        ...settingsRes.data,
+        office_latitude: Number(settingsRes.data.office_latitude),
+        office_longitude: Number(settingsRes.data.office_longitude),
+        logo_url: (companyRes.data as any)?.logo_url,
+        theme_color: (companyRes.data as any)?.theme_color,
+      } as CompanySettings);
+    }
     setLoading(false);
   }, [user?.companyId]);
 

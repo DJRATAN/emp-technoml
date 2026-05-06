@@ -18,7 +18,7 @@ Deno.serve(async (req) => {
     const body = await req.json();
 
     if (body.action === 'password') {
-      const { userId, newPassword } = body;
+      const { userId, newPassword, adminId, companyId } = body;
       if (!userId || !newPassword) throw new Error('Missing data');
 
       const pass = String(newPassword).trim();
@@ -28,11 +28,25 @@ Deno.serve(async (req) => {
       const { data: user, error: getErr } = await supabase.auth.admin.getUserById(userId);
       if (getErr || !user.user) throw new Error('User not found');
 
-      // 2. Perform THE MOST BASIC update possible
+      // 2. Update password
       const { error: updateErr } = await supabase.auth.admin.updateUserById(userId, { 
         password: pass 
       });
-      if (updateErr) throw updateErr;
+      
+      if (updateErr) {
+        // Log failed reset
+        if (adminId) {
+          await supabase.from('password_reset_audit').insert({
+            company_id: companyId || null,
+            admin_id: adminId,
+            target_user_id: userId,
+            target_email: user.user.email || '',
+            success: false,
+            failure_reason: updateErr.message,
+          });
+        }
+        throw updateErr;
+      }
 
       // 3. Confirm and unlock separately
       await supabase.auth.admin.updateUserById(userId, { email_confirm: true });
@@ -43,6 +57,17 @@ Deno.serve(async (req) => {
         is_active: true,
         force_password_change: false
       } as any).eq('id', userId);
+
+      // 4. Log successful reset
+      if (adminId) {
+        await supabase.from('password_reset_audit').insert({
+          company_id: companyId || null,
+          admin_id: adminId,
+          target_user_id: userId,
+          target_email: user.user.email || '',
+          success: true,
+        });
+      }
 
       return new Response(JSON.stringify({ 
         success: true, 

@@ -14,6 +14,63 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_messages: {
+        Row: {
+          acknowledged_at: string | null
+          attachment_url: string | null
+          body: string
+          company_id: string
+          created_at: string
+          disable_replies: boolean
+          expires_at: string | null
+          id: string
+          is_broadcast: boolean
+          message_type: string
+          read_at: string | null
+          receiver_id: string | null
+          require_acknowledgement: boolean
+          scheduled_at: string | null
+          sender_id: string
+          subject: string | null
+        }
+        Insert: {
+          acknowledged_at?: string | null
+          attachment_url?: string | null
+          body: string
+          company_id: string
+          created_at?: string
+          disable_replies?: boolean
+          expires_at?: string | null
+          id?: string
+          is_broadcast?: boolean
+          message_type?: string
+          read_at?: string | null
+          receiver_id?: string | null
+          require_acknowledgement?: boolean
+          scheduled_at?: string | null
+          sender_id: string
+          subject?: string | null
+        }
+        Update: {
+          acknowledged_at?: string | null
+          attachment_url?: string | null
+          body?: string
+          company_id?: string
+          created_at?: string
+          disable_replies?: boolean
+          expires_at?: string | null
+          id?: string
+          is_broadcast?: boolean
+          message_type?: string
+          read_at?: string | null
+          receiver_id?: string | null
+          require_acknowledgement?: boolean
+          scheduled_at?: string | null
+          sender_id?: string
+          subject?: string | null
+        }
+        Relationships: []
+      }
       approval_chains: {
         Row: {
           approver_user_id: string
@@ -182,28 +239,34 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          logo_url: string | null
           name: string
           owner_id: string | null
           slug: string
           status: string
+          theme_color: string | null
           updated_at: string
         }
         Insert: {
           created_at?: string
           id?: string
+          logo_url?: string | null
           name: string
           owner_id?: string | null
           slug: string
           status?: string
+          theme_color?: string | null
           updated_at?: string
         }
         Update: {
           created_at?: string
           id?: string
+          logo_url?: string | null
           name?: string
           owner_id?: string | null
           slug?: string
           status?: string
+          theme_color?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -250,6 +313,7 @@ export type Database = {
           casual_leave_quota: number
           company_id: string
           company_name: string
+          face_recognition_sensitivity: number
           geofence_radius_m: number
           late_threshold_minutes: number
           leave_approval_sla_hours: number
@@ -265,6 +329,7 @@ export type Database = {
           casual_leave_quota?: number
           company_id: string
           company_name?: string
+          face_recognition_sensitivity?: number
           geofence_radius_m?: number
           late_threshold_minutes?: number
           leave_approval_sla_hours?: number
@@ -280,6 +345,7 @@ export type Database = {
           casual_leave_quota?: number
           company_id?: string
           company_name?: string
+          face_recognition_sensitivity?: number
           geofence_radius_m?: number
           late_threshold_minutes?: number
           leave_approval_sla_hours?: number
@@ -731,6 +797,39 @@ export type Database = {
           title?: string
           type?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      password_reset_audit: {
+        Row: {
+          admin_id: string
+          company_id: string | null
+          created_at: string
+          failure_reason: string | null
+          id: string
+          success: boolean
+          target_email: string
+          target_user_id: string
+        }
+        Insert: {
+          admin_id: string
+          company_id?: string | null
+          created_at?: string
+          failure_reason?: string | null
+          id?: string
+          success?: boolean
+          target_email: string
+          target_user_id: string
+        }
+        Update: {
+          admin_id?: string
+          company_id?: string | null
+          created_at?: string
+          failure_reason?: string | null
+          id?: string
+          success?: boolean
+          target_email?: string
+          target_user_id?: string
         }
         Relationships: []
       }

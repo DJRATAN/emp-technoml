@@ -39,9 +39,11 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
     navigate('/');
   };
 
+  const themeColor = user?.company?.themeColor || '#0ea5e9';
+
   return (
     <SidebarProvider>
-      <div className="min-h-screen flex w-full">
+      <div className="min-h-screen flex w-full" style={{ '--primary': themeColor } as any}>
         <AppSidebar />
         <div className="flex-1 flex flex-col min-w-0">
           <header className="h-14 flex items-center justify-between border-b bg-card px-4 sticky top-0 z-10">

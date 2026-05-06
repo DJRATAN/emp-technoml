@@ -1,9 +1,10 @@
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
 import {
   LayoutDashboard, Clock, CheckSquare, CalendarDays, TrendingUp,
   User, Users, FileBarChart, Settings, LogOut, Building2, Globe, Target, MapPin,
-  Award, MessageSquare, LifeBuoy, ToggleLeft, GitBranch
+  Award, MessageSquare, LifeBuoy, ToggleLeft, GitBranch, Megaphone, Mail
 } from 'lucide-react';
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent,
@@ -30,6 +31,7 @@ export function AppSidebar() {
     { title: 'Performance', url: '/employee/performance', icon: TrendingUp, show: true },
     { title: 'Kudos', url: '/employee/kudos', icon: Award, show: features?.kudos_enabled !== false },
     { title: 'Chat', url: '/employee/chat', icon: MessageSquare, show: features?.chat_enabled !== false },
+    { title: 'Office Updates', url: '/employee/inbox', icon: Mail, show: true },
     { title: 'Helpdesk', url: '/employee/helpdesk', icon: LifeBuoy, show: features?.helpdesk_enabled !== false },
     { title: 'Profile', url: '/employee/profile', icon: User, show: true },
   ].filter(i => i.show);
@@ -43,6 +45,7 @@ export function AppSidebar() {
     { title: 'Targets', url: '/admin/targets', icon: Target, show: true },
     { title: 'Leave Requests', url: '/admin/leave', icon: CalendarDays, show: true },
     { title: 'Helpdesk', url: '/admin/helpdesk', icon: LifeBuoy, show: features?.helpdesk_enabled !== false },
+    { title: 'Communication', url: '/admin/communication', icon: Megaphone, show: true },
     { title: 'Approval Chain', url: '/admin/approval-chain', icon: GitBranch, show: true },
     { title: 'Reports', url: '/admin/reports', icon: FileBarChart, show: true },
     { title: 'Features', url: '/admin/features', icon: ToggleLeft, show: true },
@@ -66,9 +69,19 @@ export function AppSidebar() {
     <Sidebar collapsible="icon">
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel className="gap-2">
-            <img src="/logo.png" alt="TechnoML" className="h-6 w-6" />
-            {!collapsed && <span className="font-heading font-semibold text-primary">TechnoML</span>}
+          <SidebarGroupLabel className="gap-2 px-1">
+            <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center overflow-hidden">
+              {user?.company?.logoUrl ? (
+                <img src={supabase.storage.from('company-assets').getPublicUrl(user.company.logoUrl).data.publicUrl} alt="Logo" className="object-contain h-full w-full" />
+              ) : (
+                <img src="/logo.png" alt="WorkWise" className="h-6 w-6" />
+              )}
+            </div>
+            {!collapsed && (
+              <span className="font-heading font-bold text-primary truncate">
+                {user?.company?.name ?? 'WorkWise Hub'}
+              </span>
+            )}
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>

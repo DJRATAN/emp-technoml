@@ -5,7 +5,7 @@ import type { Session, User as SbUser } from '@supabase/supabase-js';
 export type UserRole = 'super_admin' | 'admin' | 'employee';
 export type AccountStatus = 'pending' | 'approved' | 'rejected' | 'suspended';
 
-export interface AppCompany { id: string; name: string; slug: string; }
+export interface AppCompany { id: string; name: string; slug: string; logoUrl?: string | null; themeColor?: string | null; }
 
 export interface AppUser {
   id: string;
@@ -36,19 +36,20 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | null>(null);
 
 async function loadAppUser(sbUser: SbUser): Promise<AppUser | null> {
-  const [{ data: profile }, { data: roles }] = await Promise.all([
+  // 1. Load basic profile and roles
+  const [{ data: profile, error: profErr }, { data: roles }] = await Promise.all([
     supabase.from('profiles').select('*, companies:company_id(id, name, slug, owner_id)').eq('id', sbUser.id).maybeSingle(),
     supabase.from('user_roles').select('role').eq('user_id', sbUser.id),
   ]);
+
+  if (profErr) console.error('Error loading profile:', profErr);
 
   const roleSet = new Set((roles ?? []).map((r) => r.role));
   const role: UserRole = roleSet.has('super_admin') ? 'super_admin' 
     : roleSet.has('admin') ? 'admin' 
     : 'employee';
 
-
   if (!profile) {
-    // If it's a super_admin but profile is missing, return a synthetic user
     if (role === 'super_admin') {
       return {
         id: sbUser.id,
@@ -63,8 +64,26 @@ async function loadAppUser(sbUser: SbUser): Promise<AppUser | null> {
     return null;
   }
 
+  // 2. Safely attempt to load branding (in case migrations haven't run)
   const companyRaw = (profile as any).companies as any;
-  const company: AppCompany | null = companyRaw ? { id: companyRaw.id, name: companyRaw.name, slug: companyRaw.slug } : null;
+  let branding: { logoUrl?: string | null; themeColor?: string | null } = {};
+  
+  if (companyRaw?.id) {
+    const { data: bData } = await supabase
+      .from('companies')
+      .select('logo_url, theme_color' as any)
+      .eq('id', companyRaw.id)
+      .maybeSingle();
+    if (bData) branding = { logoUrl: (bData as any).logo_url, themeColor: (bData as any).theme_color };
+  }
+
+  const company: AppCompany | null = companyRaw ? { 
+    id: companyRaw.id, 
+    name: companyRaw.name, 
+    slug: companyRaw.slug,
+    ...branding
+  } : null;
+  
   const isOwner = companyRaw?.owner_id === sbUser.id;
   
   return {
