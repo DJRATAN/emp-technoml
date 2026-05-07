@@ -111,33 +111,68 @@ export default function EmployeeLeave() {
             </form>
           </Card>
           <Card className="p-6">
-            <h3 className="font-heading font-semibold mb-4">Leave History</h3>
+            <h3 className="font-heading font-semibold mb-4">Leave Status Tracker</h3>
             {loading ? (
               <div className="text-center py-8"><Loader2 className="h-6 w-6 animate-spin text-primary mx-auto" /></div>
             ) : leaves.length === 0 ? (
               <p className="text-sm text-muted-foreground py-8 text-center">No leave requests yet.</p>
             ) : (
-              <div className="space-y-3 max-h-96 overflow-y-auto">
+              <div className="space-y-4 max-h-[500px] overflow-y-auto pr-1">
                 {leaves.map((l) => {
                   const sla = settings?.leave_approval_sla_hours ?? 48;
                   const showCountdown = l.status === 'pending' && l.created_at;
                   const deadline = showCountdown ? leaveDeadlineMs(l.created_at, sla) : 0;
                   const severity = showCountdown ? deadlineSeverity(deadline) : 'safe';
                   const sevClass = severity === 'overdue' ? 'text-destructive' : severity === 'soon' ? 'text-warning' : 'text-muted-foreground';
+                  
+                  const steps = [
+                    { label: 'Submitted', done: true },
+                    { label: 'Under Review', done: l.status !== 'pending' || true },
+                    { label: l.status === 'rejected' ? 'Rejected' : 'Approved', done: l.status !== 'pending' },
+                  ];
+                  const activeStep = l.status === 'pending' ? 1 : 2;
+                  
                   return (
-                    <div key={l.id} className="p-3 rounded-xl bg-muted/40">
-                      <div className="flex justify-between items-start mb-1">
-                        <span className="font-medium capitalize">{l.leave_type} · {l.days}d</span>
+                    <div key={l.id} className="p-4 rounded-xl border bg-card hover:shadow-sm transition-shadow">
+                      <div className="flex justify-between items-start mb-3">
+                        <div>
+                          <span className="font-semibold capitalize">{l.leave_type} Leave</span>
+                          <span className="text-muted-foreground text-sm ml-2">· {l.days} day(s)</span>
+                        </div>
                         <StatusBadge status={l.status === 'approved' ? 'Approved' : l.status === 'rejected' ? 'Rejected' : 'Pending'} />
                       </div>
-                      <p className="text-xs text-muted-foreground mb-1">{l.start_date} → {l.end_date}</p>
-                      <p className="text-sm">{l.reason}</p>
+                      <p className="text-xs text-muted-foreground mb-3">{l.start_date} → {l.end_date}</p>
+                      
+                      {/* Visual Pipeline */}
+                      <div className="flex items-center gap-0 mb-3">
+                        {steps.map((step, idx) => (
+                          <div key={idx} className="flex items-center flex-1">
+                            <div className={`flex items-center justify-center w-6 h-6 rounded-full text-[10px] font-bold shrink-0 ${
+                              idx < activeStep
+                                ? (l.status === 'rejected' && idx === 2 ? 'bg-destructive text-white' : 'bg-primary text-primary-foreground')
+                                : idx === activeStep
+                                ? 'bg-primary/20 text-primary border-2 border-primary'
+                                : 'bg-muted text-muted-foreground'
+                            }`}>
+                              {idx < activeStep ? '✓' : idx + 1}
+                            </div>
+                            <span className={`text-[11px] ml-1.5 ${idx <= activeStep ? 'font-medium' : 'text-muted-foreground'}`}>
+                              {step.label}
+                            </span>
+                            {idx < steps.length - 1 && (
+                              <div className={`flex-1 h-0.5 mx-2 rounded ${idx < activeStep ? 'bg-primary' : 'bg-muted'}`} />
+                            )}
+                          </div>
+                        ))}
+                      </div>
+
+                      <p className="text-sm text-foreground/80">{l.reason}</p>
                       {showCountdown && (
-                        <p className={`text-xs flex items-center gap-1 mt-1.5 ${sevClass}`}>
+                        <p className={`text-xs flex items-center gap-1 mt-2 ${sevClass}`}>
                           <Clock className="h-3 w-3" /> Approval {formatRemaining(deadline)}
                         </p>
                       )}
-                      {l.admin_notes && <p className="text-xs italic text-muted-foreground mt-1">Admin: {l.admin_notes}</p>}
+                      {l.admin_notes && <p className="text-xs italic text-muted-foreground mt-2 p-2 bg-muted/30 rounded-lg">💬 Admin: {l.admin_notes}</p>}
                     </div>
                   );
                 })}

@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { StatCard } from '@/components/ui/stat-card';
 import { Card } from '@/components/ui/card';
-import { Clock, CheckSquare, CalendarDays, TrendingUp } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Clock, CheckSquare, CalendarDays, TrendingUp, Flame } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { StatusBadge } from '@/components/ui/status-badge';
@@ -20,17 +21,23 @@ export default function EmployeeDashboard() {
   const [taskCounts, setTaskCounts] = useState({ total: 0, completed: 0, inProgress: 0 });
   const [leaveBalance, setLeaveBalance] = useState({ used: 0, total: 26 });
   const [recentTasks, setRecentTasks] = useState<any[]>([]);
+  const [streak, setStreak] = useState({ count: 0, isActive: false });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!user) return;
     const today = new Date().toISOString().split('T')[0];
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const thirtyDaysAgoStr = thirtyDaysAgo.toISOString().split('T')[0];
+
     Promise.all([
       supabase.from('attendance').select('*').eq('user_id', user.id).eq('date', today).maybeSingle(),
       supabase.from('tasks').select('id, status').eq('assigned_to', user.id),
       supabase.from('leave_requests').select('days, status').eq('user_id', user.id).eq('status', 'approved'),
       supabase.from('tasks').select('*').eq('assigned_to', user.id).order('created_at', { ascending: false }).limit(5),
-    ]).then(([att, tasks, leaves, recent]) => {
+      supabase.from('attendance').select('date').eq('user_id', user.id).gte('date', thirtyDaysAgoStr).order('date', { ascending: false }),
+    ]).then(([att, tasks, leaves, recent, history]) => {
       setTodayAtt(att.data);
       const t = tasks.data ?? [];
       setTaskCounts({
@@ -41,6 +48,34 @@ export default function EmployeeDashboard() {
       const used = (leaves.data ?? []).reduce((s, l) => s + (l.days ?? 0), 0);
       setLeaveBalance((b) => ({ ...b, used }));
       setRecentTasks(recent.data ?? []);
+
+      // Calculate Streak
+      let currentStreak = 0;
+      let isActive = !!att.data; // Active if checked in today
+      const dates = (history.data ?? []).map((h: any) => h.date);
+      
+      const checkDate = new Date();
+      if (!isActive) {
+        checkDate.setDate(checkDate.getDate() - 1); // Start checking from yesterday if not checked in today
+      }
+
+      for (let i = 0; i < 30; i++) {
+        const dStr = checkDate.toISOString().split('T')[0];
+        if (dates.includes(dStr)) {
+          currentStreak++;
+          checkDate.setDate(checkDate.getDate() - 1);
+        } else {
+          // Ignore weekends (Saturday=6, Sunday=0) for streak calculation
+          const day = checkDate.getDay();
+          if (day === 0 || day === 6) {
+            checkDate.setDate(checkDate.getDate() - 1);
+            continue;
+          }
+          break; // Missed a workday
+        }
+      }
+      setStreak({ count: currentStreak, isActive: isActive || currentStreak > 0 });
+
       setLoading(false);
     });
   }, [user]);
@@ -52,9 +87,28 @@ export default function EmployeeDashboard() {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-heading font-bold">Welcome back, {user?.name?.split(' ')[0]} 👋</h1>
-          <p className="text-muted-foreground">Here's your day at a glance</p>
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-heading font-bold">Welcome back, {user?.name?.split(' ')[0]} 👋</h1>
+            <p className="text-muted-foreground">Here's your day at a glance</p>
+          </div>
+          
+          {/* Streak Widget */}
+          {streak.count > 0 && (
+            <div className={`flex items-center gap-3 px-4 py-2 rounded-2xl border bg-card shadow-sm ${streak.isActive ? 'border-orange-500/30' : 'opacity-70'}`}>
+              <div className="bg-orange-500/10 p-2 rounded-xl">
+                <Flame className={`h-6 w-6 ${streak.isActive ? 'text-orange-500 animate-pulse' : 'text-muted-foreground'}`} />
+              </div>
+              <div>
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Current Streak</p>
+                <div className="flex items-baseline gap-1">
+                  <span className="text-xl font-bold font-heading">{streak.count}</span>
+                  <span className="text-sm font-medium">Days</span>
+                  {streak.count >= 5 && <Badge variant="secondary" className="ml-2 bg-orange-500/10 text-orange-600 border-none">Early Bird</Badge>}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
         <div className="grid gap-4 lg:grid-cols-3">
           <div className="lg:col-span-2"><EmployeeIdCard /></div>

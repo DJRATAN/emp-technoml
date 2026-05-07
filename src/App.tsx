@@ -10,6 +10,7 @@ import PricingPage from "./pages/PricingPage";
 import ForgotPasswordPage from "./pages/ForgotPasswordPage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
 import PendingApproval from "./pages/PendingApproval";
+import OnboardingPage from "./pages/OnboardingPage";
 import EmployeeDashboard from "./pages/employee/EmployeeDashboard";
 import EmployeeAttendance from "./pages/employee/EmployeeAttendance";
 import EmployeeTasks from "./pages/employee/EmployeeTasks";
@@ -25,6 +26,12 @@ import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminTargets from "./pages/admin/AdminTargets";
 import AdminHelpdesk from "./pages/admin/AdminHelpdesk";
 import AdminCommunication from "./pages/admin/AdminCommunication";
+import AdminWellbeing from "./pages/admin/AdminWellbeing";
+import AdminPayroll from "./pages/admin/AdminPayroll";
+import AdminAuditLog from "./pages/admin/AdminAuditLog";
+import AdminPermissions from "./pages/admin/AdminPermissions";
+import AdminCorrections from "./pages/admin/AdminCorrections";
+import { PolicyUpdateGuard } from "./components/PolicyUpdateGuard";
 import AdminFeatures from "./pages/admin/AdminFeatures";
 import AdminApprovalChain from "./pages/admin/AdminApprovalChain";
 import AdminEmployees from "./pages/admin/AdminEmployees";
@@ -90,6 +97,7 @@ function AppRoutes() {
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
       <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route path="/pending" element={<PendingApproval />} />
+      <Route path="/onboarding" element={<OnboardingPage />} />
 
       <Route path="/super-admin" element={<ProtectedRoute allow={['super_admin']}><SuperAdminCompanies /></ProtectedRoute>} />
 
@@ -117,6 +125,11 @@ function AppRoutes() {
       <Route path="/admin/settings" element={<ProtectedRoute allow={['admin', 'super_admin']}><AdminSettings /></ProtectedRoute>} />
       <Route path="/admin/helpdesk" element={<ProtectedRoute allow={['admin', 'super_admin']}><AdminHelpdesk /></ProtectedRoute>} />
       <Route path="/admin/communication" element={<ProtectedRoute allow={['admin', 'super_admin']}><AdminCommunication /></ProtectedRoute>} />
+      <Route path="/admin/wellbeing" element={<ProtectedRoute allow={['admin', 'super_admin']}><AdminWellbeing /></ProtectedRoute>} />
+      <Route path="/admin/payroll" element={<ProtectedRoute allow={['admin', 'super_admin']}><AdminPayroll /></ProtectedRoute>} />
+      <Route path="/admin/audit" element={<ProtectedRoute allow={['admin', 'super_admin']}><AdminAuditLog /></ProtectedRoute>} />
+      <Route path="/admin/permissions" element={<ProtectedRoute allow={['admin']}><AdminPermissions /></ProtectedRoute>} />
+      <Route path="/admin/corrections" element={<ProtectedRoute allow={['admin']}><AdminCorrections /></ProtectedRoute>} />
       <Route path="/admin/features" element={<ProtectedRoute allow={['admin', 'super_admin']}><AdminFeatures /></ProtectedRoute>} />
       <Route path="/admin/approval-chain" element={<ProtectedRoute allow={['admin', 'super_admin']}><AdminApprovalChain /></ProtectedRoute>} />
 
@@ -133,6 +146,7 @@ const App = () => (
       <BrowserRouter>
         <AuthProvider>
           <AppRoutes />
+          <PolicyUpdateGuard />
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>

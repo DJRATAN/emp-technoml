@@ -131,12 +131,12 @@ const FEATURE_PREVIEWS: Record<string, { title: string; bullets: string[] }> = {
       "📊 Admin sees a real-time attendance log with selfie thumbnails and location",
     ],
   },
-  "Task & Targets": {
+  "Tasks & Targets": {
     title: "Task & Target Tracking Preview",
     bullets: [
-      "📋 Admin assigns tasks with priority (low/medium/high/urgent) and due dates",
-      "🎯 Monthly targets with bank/category breakdown and progress tracking",
-      "📈 Employees update progress count; admins see completion percentage",
+      "📋 Admin assigns tasks with priority (low/medium/high) and due dates",
+      "🎯 Monthly targets with progress tracking and completion percentage",
+      "🔗 Sub-task dependency chains — tasks locked until parent is completed",
       "📑 CSV bulk upload for importing hundreds of tasks/targets at once",
     ],
   },
@@ -145,26 +145,39 @@ const FEATURE_PREVIEWS: Record<string, { title: string; bullets: string[] }> = {
     bullets: [
       "📝 Employees submit leave requests with type, dates, and reason",
       "🔗 Multi-level approval chain: Team Lead → Dept Head → HR",
-      "📅 Calendar view shows team availability and leave overlaps",
-      "⏱️ SLA tracking ensures approvals happen within configured hours",
+      "⏱️ SLA countdown ensures approvals happen within configured hours",
+      "✏️ Attendance corrections — employees can request fix for wrong punch times",
+    ],
+  },
+  "Admin Broadcasts": {
+    title: "Admin Communication Preview",
+    bullets: [
+      "📢 Admins broadcast official announcements to all employees",
+      "✅ Read receipts and acknowledgement tracking per message",
+      "🏢 Office Updates inbox — employees receive top-down communications",
+      "📎 Rich text broadcasts with file attachments supported",
     ],
   },
 };
 
 /* ─── Features ─── */
 const FEATURES = [
-  { icon: UserCheck, title: "Face Attendance", desc: "Selfie-based check-in with anti-spoofing liveness detection for fraud-proof attendance.", hasPreview: true },
-  { icon: MapPin, title: "GPS Geofencing", desc: "Restrict attendance marking to office radius. Real-time live map of employee locations.", hasPreview: false },
-  { icon: Calendar, title: "Leave Management", desc: "Apply, approve, and track leaves with configurable multi-level approval chains and SLA.", hasPreview: true },
-  { icon: Target, title: "Task & Targets", desc: "Assign monthly targets, track progress with pending/completed status and CSV bulk upload.", hasPreview: true },
-  { icon: BarChart3, title: "Reports & Analytics", desc: "Company-wide reports, attendance trends, performance metrics, and predictive insights.", hasPreview: false },
-  { icon: MessageSquare, title: "Team Chat", desc: "Real-time tenant-scoped messaging with channels, file attachments, and notifications.", hasPreview: false },
-  { icon: Star, title: "Kudos & Recognition", desc: "Peer recognition wall with badges — Star, Helpful, MVP — to boost team morale.", hasPreview: false },
-  { icon: Headphones, title: "Helpdesk & Ticketing", desc: "Full internal ticketing with categories, priorities, SLA tracking, and attachments.", hasPreview: false },
-  { icon: Bell, title: "Notifications", desc: "In-app bell and email notifications for leave approvals, target assignments, and more.", hasPreview: false },
-  { icon: ShieldCheck, title: "Multi-Tenant Security", desc: "Company-level data isolation with RLS, feature flags, and role-based access control.", hasPreview: false },
-  { icon: Clock, title: "Shift & Overtime", desc: "Auto shift scheduling, overtime calculation, and configurable work hour policies.", hasPreview: false },
-  { icon: FileText, title: "Payroll & Payslips", desc: "Auto-generate payslips from salary fields, attendance, and deductions each month.", hasPreview: false },
+  { icon: UserCheck, title: "Face Attendance", desc: "Selfie-based check-in with GPS dual-verification. Anti-spoofing liveness detection for fraud-proof attendance.", hasPreview: true },
+  { icon: MapPin, title: "GPS Live Map", desc: "Real-time live map of all employee locations. Restrict check-in to office geofence with configurable radius.", hasPreview: false },
+  { icon: Calendar, title: "Leave Management", desc: "Apply, approve, and track leaves with multi-level approval chains, SLA countdown, and annual/sick/casual quotas.", hasPreview: true },
+  { icon: Target, title: "Tasks & Targets", desc: "Assign tasks with priority & due dates. Monthly targets with sub-task dependency chains and progress tracking.", hasPreview: true },
+  { icon: Clock, title: "Attendance Corrections", desc: "Employees request punch-time corrections. Admins review with original GPS and selfie evidence before approving.", hasPreview: false },
+  { icon: Send, title: "Admin Broadcasts", desc: "Top-down official communication channel with read receipts, acknowledgements, and file attachments.", hasPreview: true },
+  { icon: BarChart3, title: "Reports & Analytics", desc: "Company-wide attendance trends, performance metrics, payroll summaries, and predictive attrition insights.", hasPreview: false },
+  { icon: MessageSquare, title: "Team Chat", desc: "Real-time tenant-scoped messaging. Office Updates inbox keeps official comms separate from casual chat.", hasPreview: false },
+  { icon: Star, title: "Kudos & Recognition", desc: "Peer recognition wall with Star, Helpful, MVP badges — boost team morale and engagement.", hasPreview: false },
+  { icon: Headphones, title: "Helpdesk Ticketing", desc: "Full internal ticketing with categories, priorities, SLA tracking, and file attachments.", hasPreview: false },
+  { icon: FileText, title: "Payroll & Payslips", desc: "Auto-generate payslips from salary, attendance, and deductions. Download PDF payslips each month.", hasPreview: false },
+  { icon: ArrowRight, title: "Approval Chains", desc: "Configurable multi-step approval workflows for leaves and corrections. Custom Team Lead → HR chains.", hasPreview: false },
+  { icon: TrendingUp, title: "Employee Wellbeing", desc: "Daily mood tracking, burnout risk scoring, and wellness heatmaps to keep your team healthy.", hasPreview: false },
+  { icon: ShieldCheck, title: "Audit Trail", desc: "Immutable log of every admin action — approvals, settings changes, broadcasts — for full compliance.", hasPreview: false },
+  { icon: Lock, title: "Admin Permissions", desc: "Granular permission matrix — control which admins can reset passwords, manage payroll, or view chat.", hasPreview: false },
+  { icon: Zap, title: "Multi-Tenant Security", desc: "Company-level data isolation with RLS, feature flags, role-based access, and session kill-switch.", hasPreview: false },
 ];
 
 function FeaturesSection() {
@@ -300,17 +313,17 @@ function PricingSection() {
   const plans = [
     {
       name: "Starter", price: "Free", period: "", desc: "For small teams getting started",
-      features: ["Up to 10 employees", "Face attendance", "Basic leave management", "GPS geofencing", "Email support"],
+      features: ["Up to 10 employees", "Face attendance + GPS", "Basic leave management", "Attendance corrections", "Helpdesk ticketing", "Email support"],
       cta: "Start Free", popular: false,
     },
     {
-      name: "Professional", price: "$4", period: "/user/mo", desc: "For growing businesses",
-      features: ["Unlimited employees", "Everything in Starter", "Task & target tracking", "Team chat & kudos", "Multi-level approvals", "Helpdesk ticketing", "CSV bulk upload", "Priority support"],
+      name: "Professional", price: "₹99", period: "/user/mo", desc: "For growing businesses",
+      features: ["Unlimited employees", "Everything in Starter", "Tasks, targets & approval chains", "Payroll & payslips", "Admin broadcasts & read receipts", "Team chat & kudos wall", "Employee wellbeing & mood tracking", "Audit trail & admin permissions", "Reports & analytics", "Priority support"],
       cta: "Start Trial", popular: true,
     },
     {
       name: "Enterprise", price: "Custom", period: "", desc: "For large organizations",
-      features: ["Everything in Professional", "Custom branding & logo", "SSO / SAML integration", "Dedicated account manager", "API access", "On-premise option", "SLA guarantee", "Custom integrations"],
+      features: ["Everything in Professional", "Custom branding & logo upload", "SSO / SAML integration", "Dedicated account manager", "API access & webhooks", "On-premise deployment", "SLA guarantee", "Predictive attrition analytics", "Custom integrations"],
       cta: "Contact Sales", popular: false,
     },
   ];
@@ -432,7 +445,7 @@ function CTASection() {
         <p className="mx-auto mt-3 max-w-lg text-primary-foreground/80">Join 500+ companies already using TechnoML to streamline attendance, leave, tasks, and team collaboration.</p>
         <div className="mt-8 flex flex-wrap justify-center gap-4">
           <Button size="lg" variant="secondary" onClick={() => navigate("/login")} className="gap-2">Get Started Free <ArrowRight className="h-4 w-4" /></Button>
-          <Button size="lg" variant="outline" className="border-primary-foreground/30 text-primary-foreground hover:bg-primary-foreground/10" onClick={() => navigate("/pricing")}>View Pricing</Button>
+          <Button size="lg" variant="outline" className="border-primary-foreground/30 text-primary hover:bg-primary-foreground/10 hover:text-white" onClick={() => navigate("/pricing")}>View Pricing</Button>
         </div>
       </div>
     </section>

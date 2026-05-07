@@ -17,6 +17,7 @@ import {
   KeyRound, Power, PowerOff, Shield, Lock, Snowflake, AlertTriangle, Eye, EyeOff
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { useAuditLog } from '@/hooks/useAuditLog';
 
 type UserRole = 'employee' | 'admin' | 'super_admin';
 
@@ -47,6 +48,7 @@ export default function AdminEmployeeDetail() {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { log } = useAuditLog();
   const [form, setForm] = useState<ProfileForm>({
     full_name: '', phone: '', department: '', job_title: '',
     emergency_contact: '', address: '', date_of_birth: '', avatar_url: '', id_card_url: '',
@@ -167,8 +169,12 @@ export default function AdminEmployeeDetail() {
 
       // Load granular permissions if user is an admin
       if (id) {
-        const { data: pData } = await supabase.from('admin_permissions' as any).select('*').eq('user_id', id).maybeSingle();
-        if (pData) setPermissions(pData);
+        const { data: pData, error: pError } = await supabase.from('admin_permissions' as any).select('*').eq('admin_id', id).maybeSingle();
+        if (pError && (pError.code === '42P01' || pError.message.includes('cache'))) {
+          console.warn('admin_permissions table missing');
+        } else if (pData) {
+          setPermissions(pData);
+        }
         else if (rData && rData.some(r => r.role === 'admin')) {
           // Initialize if they are an admin but have no permission record
           setPermissions({
@@ -375,10 +381,10 @@ export default function AdminEmployeeDetail() {
       
       // If promoting to admin, ensure they have a permissions record
       if (newRole === 'admin') {
-        const { data: existing } = await supabase.from('admin_permissions' as any).select('id').eq('user_id', id).maybeSingle();
-        if (!existing) {
+        const { data: existing, error: eError } = await supabase.from('admin_permissions' as any).select('id').eq('admin_id', id).maybeSingle();
+        if (!existing && !eError) {
           const { data: newPerms } = await supabase.from('admin_permissions' as any).insert({
-            user_id: id,
+            admin_id: id,
             company_id: user?.companyId,
             can_view_attendance: true,
             can_manage_tasks: true
@@ -402,12 +408,11 @@ export default function AdminEmployeeDetail() {
     setPermSaving(true);
     try {
       const { error } = await supabase.from('admin_permissions' as any).upsert({
-        user_id: id,
+        admin_id: id,
         company_id: user?.companyId,
         ...permissions
-      }).eq('user_id', id);
-      if (error) throw error;
-      toast.success('Admin permissions updated');
+      });
+
     } catch (e: any) {
       toast.error(e.message);
     } finally {
@@ -737,6 +742,40 @@ export default function AdminEmployeeDetail() {
                     </form>
                   </DialogContent>
                 </Dialog>
+              </div>
+
+              <div className="flex items-center justify-between border-t pt-4">
+                <div>
+                  <p className="text-sm font-medium">Session Management</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Instantly invalidate all active web and mobile sessions for this user.
+                  </p>
+                </div>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="gap-2 text-destructive hover:bg-destructive/10"
+                  disabled={busyAction === 'kill-sessions'}
+                  onClick={async () => {
+                    if (!id) return;
+                    setBusyAction('kill-sessions');
+                    try {
+                      const { error } = await supabase.from('profiles').update({ 
+                        force_logout_at: new Date().toISOString() 
+                      } as any).eq('id', id);
+                      if (error) throw error;
+                      toast.success('All sessions have been invalidated.');
+                      log('password.reset', 'employee', id, { type: 'session_kill' });
+                    } catch (e: any) {
+                      toast.error(e.message);
+                    } finally {
+                      setBusyAction(null);
+                    }
+                  }}
+                >
+                  {busyAction === 'kill-sessions' ? <Loader2 className="h-4 w-4 animate-spin" /> : <PowerOff className="h-4 w-4" />}
+                  Kill All Sessions
+                </Button>
               </div>
             </div>
           </Card>

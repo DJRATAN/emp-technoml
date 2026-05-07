@@ -9,12 +9,15 @@ import { Progress } from '@/components/ui/progress';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { Calendar, Loader2, Target } from 'lucide-react';
+import { Calendar, Loader2, Target, Lock } from 'lucide-react';
 import { toast } from 'sonner';
 
 type Task = { id: string; title: string; description: string | null; priority: 'low'|'medium'|'high';
   status: 'pending'|'in_progress'|'completed'; due_date: string | null;
-  is_target: boolean; target_month: string | null; target_count: number | null; progress_count: number; };
+  is_target: boolean; target_month: string | null; target_count: number | null; progress_count: number;
+  parent_task_id: string | null;
+  parent_task?: { title: string; status: string } | null;
+};
 
 const priorityVariant: Record<string, 'destructive' | 'default' | 'secondary'> = {
   high: 'destructive', medium: 'default', low: 'secondary',
@@ -28,9 +31,36 @@ export default function EmployeeTasks() {
 
   const load = useCallback(async () => {
     if (!user) return;
-    const { data, error } = await supabase.from('tasks').select('*').eq('assigned_to', user.id).order('due_date', { ascending: true });
-    if (error) toast.error(error.message);
-    setTasks((data as Task[]) ?? []); setLoading(false);
+
+    // Step 1: fetch tasks without the broken self-referential join
+    const { data, error } = await supabase
+      .from('tasks')
+      .select('*')
+      .eq('assigned_to', user.id)
+      .order('due_date', { ascending: true });
+
+    if (error) { toast.error(error.message); setLoading(false); return; }
+
+    const rows = (data ?? []) as unknown as Task[];
+
+    // Step 2: fetch parent task info for any sub-tasks (single round-trip)
+    const parentIds = [...new Set(rows.map(t => t.parent_task_id).filter(Boolean))] as string[];
+    if (parentIds.length > 0) {
+      const { data: parents } = await supabase
+        .from('tasks')
+        .select('id, title, status')
+        .in('id', parentIds);
+
+      const parentMap = Object.fromEntries((parents ?? []).map(p => [p.id, p]));
+      rows.forEach(t => {
+        if (t.parent_task_id && parentMap[t.parent_task_id]) {
+          t.parent_task = parentMap[t.parent_task_id] as { title: string; status: string };
+        }
+      });
+    }
+
+    setTasks(rows);
+    setLoading(false);
   }, [user]);
 
   useEffect(() => { load(); }, [load]);
@@ -107,6 +137,12 @@ export default function EmployeeTasks() {
           <h4 className="font-semibold">{t.title}</h4>
           <Badge variant={priorityVariant[t.priority]}>{t.priority}</Badge>
         </div>
+        {t.parent_task && t.parent_task.status !== 'completed' && (
+          <div className="flex items-center gap-2 p-2 rounded-lg bg-warning/10 border border-warning/20 text-warning text-xs mb-3">
+            <Lock className="h-3 w-3" />
+            <span>Locked until <strong>{t.parent_task.title}</strong> is finished.</span>
+          </div>
+        )}
         {t.description && <p className="text-sm text-muted-foreground mb-3">{t.description}</p>}
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div className="flex items-center gap-3 text-xs text-muted-foreground">
@@ -115,10 +151,10 @@ export default function EmployeeTasks() {
           </div>
           <div className="flex gap-2">
             {t.status !== 'in_progress' && t.status !== 'completed' && (
-              <Button size="sm" variant="outline" disabled={updatingId === t.id} onClick={() => setStatus(t.id, 'in_progress')}>Start</Button>
+              <Button size="sm" variant="outline" disabled={updatingId === t.id || (t.parent_task && t.parent_task.status !== 'completed')} onClick={() => setStatus(t.id, 'in_progress')}>Start</Button>
             )}
             {t.status !== 'completed' && (
-              <Button size="sm" disabled={updatingId === t.id} onClick={() => setStatus(t.id, 'completed')}>
+              <Button size="sm" disabled={updatingId === t.id || (t.parent_task && t.parent_task.status !== 'completed')} onClick={() => setStatus(t.id, 'completed')}>
                 {updatingId === t.id ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Complete'}
               </Button>
             )}

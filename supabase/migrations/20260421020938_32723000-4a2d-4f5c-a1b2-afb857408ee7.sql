@@ -17,6 +17,10 @@ ALTER TABLE public.attendance       ADD COLUMN company_id uuid REFERENCES public
 ALTER TABLE public.tasks            ADD COLUMN company_id uuid REFERENCES public.companies(id) ON DELETE CASCADE;
 ALTER TABLE public.leave_requests   ADD COLUMN company_id uuid REFERENCES public.companies(id) ON DELETE CASCADE;
 
+-- Task Dependencies
+ALTER TABLE public.tasks ADD COLUMN IF NOT EXISTS parent_task_id UUID REFERENCES public.tasks(id) ON DELETE SET NULL;
+
+
 -- 4. company_settings: drop singleton, make per-company
 ALTER TABLE public.company_settings DROP CONSTRAINT IF EXISTS company_settings_pkey;
 ALTER TABLE public.company_settings ADD COLUMN company_id uuid REFERENCES public.companies(id) ON DELETE CASCADE;

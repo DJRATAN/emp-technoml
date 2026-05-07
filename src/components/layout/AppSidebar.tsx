@@ -1,26 +1,24 @@
 import { useAuth } from '@/contexts/AuthContext';
-import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import {
   LayoutDashboard, Clock, CheckSquare, CalendarDays, TrendingUp,
-  User, Users, FileBarChart, Settings, LogOut, Building2, Globe, Target, MapPin,
-  Award, MessageSquare, LifeBuoy, ToggleLeft, GitBranch, Megaphone, Mail
+  User, Users, FileBarChart, Settings, Building2, Globe, Target, MapPin,
+  Award, MessageSquare, LifeBuoy, ToggleLeft, GitBranch, Megaphone, Mail, HeartPulse, DollarSign, Shield
 } from 'lucide-react';
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent,
   SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem,
-  SidebarFooter, useSidebar,
+  useSidebar,
 } from '@/components/ui/sidebar';
 import { NavLink } from '@/components/NavLink';
 import { Button } from '@/components/ui/button';
 import { useCompanyFeatures } from '@/hooks/useCompanyFeatures';
 
 export function AppSidebar() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const { features } = useCompanyFeatures();
   const { state } = useSidebar();
   const collapsed = state === 'collapsed';
-  const navigate = useNavigate();
 
   const employeeMenu = [
     { title: 'Dashboard', url: '/employee', icon: LayoutDashboard, show: true },
@@ -46,6 +44,11 @@ export function AppSidebar() {
     { title: 'Leave Requests', url: '/admin/leave', icon: CalendarDays, show: true },
     { title: 'Helpdesk', url: '/admin/helpdesk', icon: LifeBuoy, show: features?.helpdesk_enabled !== false },
     { title: 'Communication', url: '/admin/communication', icon: Megaphone, show: true },
+    { title: 'Wellbeing', url: '/admin/wellbeing', icon: HeartPulse, show: true },
+    { title: 'Payroll', url: '/admin/payroll', icon: DollarSign, show: true },
+    { title: 'Audit Trail', url: '/admin/audit', icon: Shield, show: true },
+    { title: 'Permissions', url: '/admin/permissions', icon: Shield, show: true },
+    { title: 'Corrections', url: '/admin/corrections', icon: Clock, show: true },
     { title: 'Approval Chain', url: '/admin/approval-chain', icon: GitBranch, show: true },
     { title: 'Reports', url: '/admin/reports', icon: FileBarChart, show: true },
     { title: 'Features', url: '/admin/features', icon: ToggleLeft, show: true },
@@ -60,10 +63,6 @@ export function AppSidebar() {
   const menu = user?.role === 'super_admin' ? superAdminMenu
     : user?.role === 'admin' ? adminMenu : employeeMenu;
 
-  const handleLogout = async () => {
-    await logout();
-    navigate('/');
-  };
 
   return (
     <Sidebar collapsible="icon">
@@ -104,19 +103,6 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
-      <SidebarFooter className="p-3">
-        {!collapsed && user && (
-          <div className="mb-2 px-2">
-            <p className="text-sm font-medium truncate">{user.name}</p>
-            <p className="text-xs text-muted-foreground truncate">{user.email}</p>
-            {user.company && <p className="text-[10px] text-muted-foreground truncate uppercase tracking-wide">{user.company.slug}</p>}
-          </div>
-        )}
-        <Button variant="ghost" size="sm" className="w-full justify-start text-destructive hover:text-destructive hover:bg-destructive/10" onClick={handleLogout}>
-          <LogOut className="h-4 w-4 mr-2" />
-          {!collapsed && 'Logout'}
-        </Button>
-      </SidebarFooter>
     </Sidebar>
   );
 }

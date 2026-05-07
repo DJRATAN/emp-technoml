@@ -8,6 +8,7 @@ import { useCompanySettings } from '@/hooks/useCompanySettings';
 import { supabase } from '@/integrations/supabase/client';
 import { Loader2, MapPin, Upload, Palette, Cpu } from 'lucide-react';
 import { toast } from 'sonner';
+import { useAuditLog } from '@/hooks/useAuditLog';
 import { getCurrentPosition } from '@/lib/helpers';
 import { Slider } from '@/components/ui/slider';
 
@@ -16,6 +17,7 @@ export default function AdminSettings() {
   const [form, setForm] = useState<any>(null);
   const [saving, setSaving] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
+  const { log } = useAuditLog();
 
   useEffect(() => { if (settings) setForm({ ...settings }); }, [settings]);
 
@@ -62,6 +64,7 @@ export default function AdminSettings() {
       if (setErr) throw setErr;
 
       toast.success('Settings saved');
+      log('settings.updated', 'settings', form.company_id, { company_name: form.company_name });
       refresh();
     } catch (e: any) {
       toast.error(e.message);
@@ -74,13 +77,32 @@ export default function AdminSettings() {
     const file = e.target.files?.[0];
     if (!file || !form.company_id) return;
     if (file.size > 2 * 1024 * 1024) return toast.error('Max logo size is 2MB');
-    
+
     setUploadingLogo(true);
     try {
       const ext = file.name.split('.').pop();
       const path = `${form.company_id}/logo_${Date.now()}.${ext}`;
-      const { error: upErr } = await supabase.storage.from('company-assets').upload(path, file);
-      if (upErr) throw upErr;
+      const { error: upErr } = await supabase.storage.from('company-assets').upload(path, file, {
+        upsert: true,
+        contentType: file.type,
+      });
+
+      if (upErr) {
+        const isBucketMissing =
+          upErr.message?.toLowerCase().includes('bucket') ||
+          upErr.message?.toLowerCase().includes('not found') ||
+          (upErr as any)?.statusCode === 404;
+
+        if (isBucketMissing) {
+          toast.error(
+            'Storage bucket missing. Run migration 20260507030000_company_assets_bucket.sql in Supabase SQL Editor.',
+            { duration: 8000 }
+          );
+        } else {
+          toast.error(upErr.message);
+        }
+        return;
+      }
 
       update('logo_url', path);
       toast.success('Logo uploaded. Click Save to apply.');

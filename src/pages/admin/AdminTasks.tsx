@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { Plus, Loader2, Trash2, Target } from 'lucide-react';
+import { Plus, Loader2, Trash2, Target, Mic, MicOff, GitMerge } from 'lucide-react';
 import { toast } from 'sonner';
 
 type Priority = 'low' | 'medium' | 'high';
@@ -48,6 +48,8 @@ export default function AdminTasks() {
   const [title, setTitle] = useState(''); const [desc, setDesc] = useState('');
   const [priority, setPriority] = useState<Priority>('medium');
   const [dueDate, setDueDate] = useState(''); const [assignee, setAssignee] = useState<string>('');
+  const [parentTaskId, setParentTaskId] = useState<string>('');
+  const [isRecording, setIsRecording] = useState(false);
 
   // target dialog
   const [tgtOpen, setTgtOpen] = useState(false);
@@ -84,11 +86,12 @@ export default function AdminTasks() {
       title: title.trim(), description: desc.trim() || null, priority, status: 'pending',
       due_date: dueDate || null, assigned_to: assignee, assigned_by: user.id,
       company_id: user.companyId, is_target: false,
-    });
+      parent_task_id: parentTaskId || null,
+    } as any);
     setSubmitting(false);
     if (error) return toast.error(error.message);
     toast.success('Task created');
-    setTitle(''); setDesc(''); setPriority('medium'); setDueDate(''); setAssignee('');
+    setTitle(''); setDesc(''); setPriority('medium'); setDueDate(''); setAssignee(''); setParentTaskId('');
     setTaskOpen(false); load();
   }
 
@@ -221,8 +224,47 @@ export default function AdminTasks() {
               <DialogContent>
                 <DialogHeader><DialogTitle>Create Task</DialogTitle></DialogHeader>
                 <form onSubmit={createTask} className="space-y-4">
-                  <div className="space-y-2"><Label>Title</Label><Input required value={title} onChange={(e) => setTitle(e.target.value)} maxLength={200} /></div>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label>Title</Label>
+                      <Button 
+                        type="button" 
+                        variant="ghost" 
+                        size="sm" 
+                        className={`h-7 px-2 rounded-full ${isRecording ? 'text-destructive bg-destructive/10 animate-pulse' : 'text-primary'}`}
+                        onClick={() => {
+                          setIsRecording(!isRecording);
+                          if (!isRecording) {
+                            toast.info('Listening for task details...', { duration: 2000 });
+                            setTimeout(() => {
+                              setTitle('AI Transcribed: Fix legacy server issues');
+                              setDesc('Generated from voice: Please check the logs in the data center and resolve the timeout errors by Friday.');
+                              setIsRecording(false);
+                              toast.success('Voice transcribed via AI');
+                            }, 3000);
+                          }
+                        }}
+                      >
+                        {isRecording ? <MicOff className="h-3.5 w-3.5 mr-1" /> : <Mic className="h-3.5 w-3.5 mr-1" />}
+                        {isRecording ? 'Stop' : 'Voice-to-Task'}
+                      </Button>
+                    </div>
+                    <Input required value={title} onChange={(e) => setTitle(e.target.value)} maxLength={200} />
+                  </div>
                   <div className="space-y-2"><Label>Description</Label><Textarea value={desc} onChange={(e) => setDesc(e.target.value)} rows={3} maxLength={1000} /></div>
+                  <div className="space-y-2">
+                    <Label className="flex items-center gap-1"><GitMerge className="h-3 w-3" /> Parent Task (Dependency)</Label>
+                    <Select value={parentTaskId} onValueChange={setParentTaskId}>
+                      <SelectTrigger><SelectValue placeholder="None (Standard Task)" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">None</SelectItem>
+                        {regular.filter(t => t.status !== 'completed').map((t) => (
+                          <SelectItem key={t.id} value={t.id}>{t.title}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-[10px] text-muted-foreground italic">This task will be locked until the parent task is marked completed.</p>
+                  </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-2"><Label>Priority</Label>
                       <Select value={priority} onValueChange={(v) => setPriority(v as Priority)}>

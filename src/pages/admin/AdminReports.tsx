@@ -13,7 +13,7 @@ export default function AdminReports() {
 
   useEffect(() => {
     Promise.all([
-      supabase.from('tasks').select('status, profiles!tasks_assigned_to_fkey(full_name)'),
+      supabase.from('tasks').select('status, profiles!assigned_to(full_name)'),
       supabase.from('attendance').select('status').gte('date', new Date(Date.now() - 30 * 86400000).toISOString().split('T')[0]),
       supabase.from('profiles').select('department').eq('status', 'approved'),
     ]).then(([t, a, d]) => {

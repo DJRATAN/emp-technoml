@@ -47,6 +47,9 @@ export default function AdminCommunication() {
   const [disableReplies, setDisableReplies] = useState(false);
   const [requireAck, setRequireAck] = useState(false);
   const [attachment, setAttachment] = useState<File | null>(null);
+  const [targetDept, setTargetDept] = useState<string>('all');
+  const [scheduledAt, setScheduledAt] = useState('');
+  const [expiresAt, setExpiresAt] = useState('');
 
   // Direct Message State
   const [directMsgBody, setDirectMsgBody] = useState('');
@@ -89,6 +92,10 @@ export default function AdminCommunication() {
     try {
       let attachmentUrl = null;
       if (attachment) {
+        const maxSize = 10 * 1024 * 1024; // 10MB
+        const allowedTypes = ['application/pdf', 'image/png', 'image/jpeg', 'image/webp', 'audio/mpeg', 'audio/wav', 'audio/mp4'];
+        if (attachment.size > maxSize) { setSending(false); return toast.error('File too large. Max 10MB.'); }
+        if (!allowedTypes.includes(attachment.type)) { setSending(false); return toast.error('Unsupported file type. PDF, images, or audio only.'); }
         const fileExt = attachment.name.split('.').pop();
         const fileName = `${crypto.randomUUID()}.${fileExt}`;
         const { error: uploadError } = await supabase.storage.from('admin-attachments').upload(`${user.companyId}/${fileName}`, attachment);
@@ -98,7 +105,14 @@ export default function AdminCommunication() {
       }
 
       const groupId = crypto.randomUUID();
-      const rows = employees.map(emp => ({
+      const targetEmployees = targetDept === 'all' ? employees : employees.filter(e => e.department === targetDept);
+      
+      if (targetEmployees.length === 0) {
+        setSending(false);
+        return toast.error('No employees found in the selected department');
+      }
+
+      const rows = targetEmployees.map(emp => ({
         company_id: user.companyId,
         sender_id: user.id,
         receiver_id: emp.id,
@@ -110,13 +124,15 @@ export default function AdminCommunication() {
         require_acknowledgement: requireAck,
         group_id: groupId,
         attachment_url: attachmentUrl,
+        scheduled_at: scheduledAt ? new Date(scheduledAt).toISOString() : null,
+        expires_at: expiresAt ? new Date(expiresAt).toISOString() : null,
       }));
       const { error } = await supabase.from('admin_messages' as any).insert(rows as any);
       if (error) throw error;
-      toast.success(`Broadcast sent to ${employees.length} employees`);
+      toast.success(scheduledAt ? `Broadcast scheduled for ${new Date(scheduledAt).toLocaleString()}` : `Broadcast sent to ${targetEmployees.length} employees`);
       
       setComposeOpen(false);
-      setSubject(''); setBody(''); setDisableReplies(false); setRequireAck(false); setAttachment(null);
+      setSubject(''); setBody(''); setDisableReplies(false); setRequireAck(false); setAttachment(null); setTargetDept('all'); setScheduledAt(''); setExpiresAt('');
       loadData();
     } catch (e: any) {
       toast.error(e.message);
@@ -124,6 +140,8 @@ export default function AdminCommunication() {
       setSending(false);
     }
   }
+
+  const uniqueDepartments = Array.from(new Set(employees.map(e => e.department).filter(Boolean))) as string[];
 
   async function sendDirectMessage() {
     if (!user?.companyId || !directMsgBody.trim() || selectedChat === 'broadcasts') return;
@@ -404,9 +422,21 @@ export default function AdminCommunication() {
                             </select>
                           </div>
                           <div className="space-y-2">
-                            <Label>Attachment (Optional)</Label>
-                            <Input type="file" onChange={e => setAttachment(e.target.files?.[0] || null)} />
+                            <Label>Target Audience</Label>
+                            <select 
+                              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
+                              value={targetDept} onChange={e => setTargetDept(e.target.value)}
+                            >
+                              <option value="all">All Employees</option>
+                              {uniqueDepartments.map(dept => (
+                                <option key={dept} value={dept}>{dept} Only</option>
+                              ))}
+                            </select>
                           </div>
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Attachment (Optional)</Label>
+                          <Input type="file" onChange={e => setAttachment(e.target.files?.[0] || null)} />
                         </div>
                         <div className="space-y-2">
                           <Label>Subject (Optional)</Label>
@@ -426,9 +456,19 @@ export default function AdminCommunication() {
                             <Switch checked={requireAck} onCheckedChange={setRequireAck} />
                           </div>
                         </div>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label>Schedule Send (Optional)</Label>
+                            <Input type="datetime-local" value={scheduledAt} onChange={e => setScheduledAt(e.target.value)} min={new Date().toISOString().slice(0,16)} />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Expires At (Optional)</Label>
+                            <Input type="datetime-local" value={expiresAt} onChange={e => setExpiresAt(e.target.value)} min={new Date().toISOString().slice(0,16)} />
+                          </div>
+                        </div>
                         <Button className="w-full mt-4" size="lg" onClick={sendBroadcast} disabled={sending}>
                           {sending ? <Loader2 className="h-5 w-5 animate-spin mr-2" /> : <Send className="h-5 w-5 mr-2" />}
-                          Send to {employees.length} Employees
+                          {scheduledAt ? 'Schedule' : 'Send to'} {targetDept === 'all' ? employees.length : employees.filter(e => e.department === targetDept).length} Employees
                         </Button>
                       </div>
                     </DialogContent>
@@ -480,8 +520,52 @@ export default function AdminCommunication() {
                           <span className="text-muted-foreground">Total Messages Sent</span>
                           <span className="font-bold">{messages.filter(m => m.is_broadcast).length}</span>
                         </div>
+                        {(() => {
+                          const broadcastMsgs = messages.filter(m => m.is_broadcast);
+                          const totalRead = broadcastMsgs.filter(m => m.read_at).length;
+                          const totalAck = broadcastMsgs.filter(m => m.acknowledged_at).length;
+                          const readRate = broadcastMsgs.length > 0 ? Math.round((totalRead / broadcastMsgs.length) * 100) : 0;
+                          const ackRate = broadcastMsgs.length > 0 ? Math.round((totalAck / broadcastMsgs.length) * 100) : 0;
+                          return (
+                            <>
+                              <div className="flex justify-between items-center text-sm">
+                                <span className="text-muted-foreground">Read Rate</span>
+                                <span className="font-bold text-emerald-600">{readRate}%</span>
+                              </div>
+                              <div className="flex justify-between items-center text-sm">
+                                <span className="text-muted-foreground">Ack Rate</span>
+                                <span className="font-bold text-blue-600">{ackRate}%</span>
+                              </div>
+                            </>
+                          );
+                        })()}
                       </div>
                     </div>
+
+                    {/* Unacknowledged employees for latest broadcast requiring ack */}
+                    {(() => {
+                      const latestAckBroadcast = groupedBroadcasts.find(b => b.require_acknowledgement);
+                      if (!latestAckBroadcast) return null;
+                      const groupMsgs = messages.filter(m => m.is_broadcast && (m as any).group_id === latestAckBroadcast.group_id);
+                      const unackedEmpIds = groupMsgs.filter(m => !m.acknowledged_at).map(m => m.receiver_id);
+                      const unackedEmps = employees.filter(e => unackedEmpIds.includes(e.id));
+                      if (unackedEmps.length === 0) return null;
+                      return (
+                        <div>
+                          <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
+                            Pending Acknowledgement <Badge variant="destructive" className="ml-1 text-[10px]">{unackedEmps.length}</Badge>
+                          </h4>
+                          <div className="space-y-2 max-h-48 overflow-y-auto">
+                            {unackedEmps.map(emp => (
+                              <div key={emp.id} className="flex items-center gap-2 text-sm p-2 rounded-lg bg-destructive/5 border border-destructive/10">
+                                <AlertTriangle className="h-3 w-3 text-destructive shrink-0" />
+                                <span className="truncate">{emp.full_name}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </div>
                 ) : (
                   selectedEmployeeData && (

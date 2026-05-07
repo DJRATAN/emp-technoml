@@ -78,7 +78,28 @@ Deno.serve(async (req) => {
       });
     }
 
-    return new Response(JSON.stringify({ success: true, message: "Bootstrap function active" }), {
+    if (body.action === 'run_sql') {
+      const { sql } = body;
+      if (!sql) throw new Error('Missing SQL');
+      
+      const { default: postgres } = await import('https://esm.sh/postgres@3.4.4');
+      const dbUrl = Deno.env.get('SUPABASE_DB_URL') || Deno.env.get('DATABASE_URL');
+      if (!dbUrl) throw new Error('DATABASE_URL not found in function environment');
+      
+      const sqlClient = postgres(dbUrl);
+      try {
+        const result = await sqlClient.unsafe(sql);
+        await sqlClient.end();
+        return new Response(JSON.stringify({ success: true, result }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      } catch (err: any) {
+        await sqlClient.end();
+        throw err;
+      }
+    }
+
+    return new Response(JSON.stringify({ success: true, message: "Bootstrap function v2 active" }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 

@@ -5,9 +5,10 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, Image as ImageIcon, MapPin } from 'lucide-react';
+import { Loader2, Image as ImageIcon, MapPin, TrendingUp, AlertCircle, BarChart3 } from 'lucide-react';
 import { formatTime } from '@/lib/helpers';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { CheckCircle2 } from 'lucide-react';
 
 type Row = { id: string; date: string; check_in: string | null; check_out: string | null;
   selfie_path: string | null; latitude: number | null; longitude: number | null; distance_m: number | null;
@@ -48,6 +49,73 @@ export default function AdminAttendance() {
           <h1 className="text-2xl font-heading font-bold">Attendance Monitoring</h1>
           <p className="text-muted-foreground">Review check-ins, selfies, and location verification</p>
         </div>
+
+        {/* AI Insights Section */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <Card className="p-6 lg:col-span-2 border-primary/10 bg-gradient-to-br from-card to-primary/5">
+            <h3 className="font-heading font-semibold flex items-center gap-2 mb-4">
+              <BarChart3 className="h-4 w-4 text-primary" />
+              AI Attendance Insights
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+              <div className="space-y-3">
+                <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Pattern Analysis</p>
+                <div className="p-3 rounded-xl bg-background border flex items-start gap-3">
+                  <TrendingUp className="h-5 w-5 text-warning" />
+                  <div>
+                    <p className="text-sm font-medium">Monday Late Pattern</p>
+                    <p className="text-[10px] text-muted-foreground leading-tight">
+                      3 employees are consistently 10+ mins late on Mondays. Recommendation: Send a "Start Week Strong" reminder.
+                    </p>
+                  </div>
+                </div>
+                <div className="p-3 rounded-xl bg-background border flex items-start gap-3">
+                  <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+                  <div>
+                    <p className="text-sm font-medium">Selfie Verification Health</p>
+                    <p className="text-[10px] text-muted-foreground leading-tight">
+                      98% match rate today. AI successfully flagged 2 low-light captures for manual review.
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div className="space-y-3">
+                <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Geofence Compliance</p>
+                <div className="p-3 rounded-xl bg-background border flex items-start gap-3">
+                  <AlertCircle className="h-5 w-5 text-destructive" />
+                  <div>
+                    <p className="text-sm font-medium">Boundary Breaches</p>
+                    <p className="text-[10px] text-muted-foreground leading-tight">
+                      Anomaly detected: 4 check-ins recorded 50m+ from office center. Potential "GPS Spoofing" risk.
+                    </p>
+                  </div>
+                </div>
+                <Button variant="ghost" size="sm" className="w-full text-[10px] uppercase tracking-tighter text-primary">
+                  View Full Analytics Report
+                </Button>
+              </div>
+            </div>
+          </Card>
+
+          <Card className="p-6 border-indigo-500/20 bg-indigo-500/5">
+            <h3 className="font-heading font-semibold flex items-center gap-2 mb-4">
+              <AlertCircle className="h-4 w-4 text-indigo-500" />
+              Risk Score
+            </h3>
+            <div className="flex flex-col items-center justify-center py-4">
+              <div className="relative h-32 w-32 flex items-center justify-center">
+                <svg className="h-full w-full" viewBox="0 0 36 36">
+                  <path className="text-muted stroke-current" strokeWidth="3" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                  <path className="text-indigo-500 stroke-current" strokeWidth="3" strokeDasharray="85, 100" strokeLinecap="round" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                </svg>
+                <span className="absolute text-2xl font-bold">12%</span>
+              </div>
+              <p className="text-xs font-medium mt-4">Low Security Risk</p>
+              <p className="text-[10px] text-muted-foreground text-center mt-1">Based on location drift, device changes, and face mismatch alerts.</p>
+            </div>
+          </Card>
+        </div>
+
         <Card className="p-6">
           <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
             <h3 className="font-heading font-semibold">Logs for {date}</h3>

@@ -23,6 +23,7 @@ export type Database = {
           created_at: string
           disable_replies: boolean
           expires_at: string | null
+          group_id: string | null
           id: string
           is_broadcast: boolean
           message_type: string
@@ -41,6 +42,7 @@ export type Database = {
           created_at?: string
           disable_replies?: boolean
           expires_at?: string | null
+          group_id?: string | null
           id?: string
           is_broadcast?: boolean
           message_type?: string
@@ -59,6 +61,7 @@ export type Database = {
           created_at?: string
           disable_replies?: boolean
           expires_at?: string | null
+          group_id?: string | null
           id?: string
           is_broadcast?: boolean
           message_type?: string
@@ -70,6 +73,50 @@ export type Database = {
           subject?: string | null
         }
         Relationships: []
+      }
+      admin_permissions: {
+        Row: {
+          admin_id: string
+          can_approve_leaves: boolean | null
+          can_manage_payroll: boolean | null
+          can_manage_settings: boolean | null
+          can_reset_passwords: boolean | null
+          can_view_chat_history: boolean | null
+          company_id: string
+          id: string
+          updated_at: string | null
+        }
+        Insert: {
+          admin_id: string
+          can_approve_leaves?: boolean | null
+          can_manage_payroll?: boolean | null
+          can_manage_settings?: boolean | null
+          can_reset_passwords?: boolean | null
+          can_view_chat_history?: boolean | null
+          company_id: string
+          id?: string
+          updated_at?: string | null
+        }
+        Update: {
+          admin_id?: string
+          can_approve_leaves?: boolean | null
+          can_manage_payroll?: boolean | null
+          can_manage_settings?: boolean | null
+          can_reset_passwords?: boolean | null
+          can_view_chat_history?: boolean | null
+          company_id?: string
+          id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "admin_permissions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       approval_chains: {
         Row: {
@@ -153,6 +200,116 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "attendance_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      attendance_corrections: {
+        Row: {
+          admin_notes: string | null
+          company_id: string
+          created_at: string | null
+          date: string
+          id: string
+          original_attendance_id: string | null
+          reason: string
+          requested_check_in: string | null
+          requested_check_out: string | null
+          reviewed_by: string | null
+          status: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          admin_notes?: string | null
+          company_id: string
+          created_at?: string | null
+          date: string
+          id?: string
+          original_attendance_id?: string | null
+          reason: string
+          requested_check_in?: string | null
+          requested_check_out?: string | null
+          reviewed_by?: string | null
+          status?: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          admin_notes?: string | null
+          company_id?: string
+          created_at?: string | null
+          date?: string
+          id?: string
+          original_attendance_id?: string | null
+          reason?: string
+          requested_check_in?: string | null
+          requested_check_out?: string | null
+          reviewed_by?: string | null
+          status?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "attendance_corrections_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "attendance_corrections_original_attendance_id_fkey"
+            columns: ["original_attendance_id"]
+            isOneToOne: false
+            referencedRelation: "attendance"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      audit_logs: {
+        Row: {
+          action: string
+          actor_id: string
+          actor_name: string
+          company_id: string
+          created_at: string
+          details: Json | null
+          entity_id: string | null
+          entity_type: string
+          id: string
+          ip_address: string | null
+        }
+        Insert: {
+          action: string
+          actor_id: string
+          actor_name: string
+          company_id: string
+          created_at?: string
+          details?: Json | null
+          entity_id?: string | null
+          entity_type: string
+          id?: string
+          ip_address?: string | null
+        }
+        Update: {
+          action?: string
+          actor_id?: string
+          actor_name?: string
+          company_id?: string
+          created_at?: string
+          details?: Json | null
+          entity_id?: string | null
+          entity_type?: string
+          id?: string
+          ip_address?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audit_logs_company_id_fkey"
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
@@ -844,6 +1001,7 @@ export type Database = {
           email: string
           emergency_contact: string | null
           failed_login_count: number
+          force_logout_at: string | null
           force_password_change: boolean
           full_name: string
           id: string
@@ -868,6 +1026,7 @@ export type Database = {
           email: string
           emergency_contact?: string | null
           failed_login_count?: number
+          force_logout_at?: string | null
           force_password_change?: boolean
           full_name: string
           id: string
@@ -892,6 +1051,7 @@ export type Database = {
           email?: string
           emergency_contact?: string | null
           failed_login_count?: number
+          force_logout_at?: string | null
           force_password_change?: boolean
           full_name?: string
           id?: string
@@ -927,6 +1087,7 @@ export type Database = {
           due_date: string | null
           id: string
           is_target: boolean
+          parent_task_id: string | null
           priority: Database["public"]["Enums"]["task_priority"]
           progress_count: number
           status: Database["public"]["Enums"]["task_status"]
@@ -945,6 +1106,7 @@ export type Database = {
           due_date?: string | null
           id?: string
           is_target?: boolean
+          parent_task_id?: string | null
           priority?: Database["public"]["Enums"]["task_priority"]
           progress_count?: number
           status?: Database["public"]["Enums"]["task_status"]
@@ -963,6 +1125,7 @@ export type Database = {
           due_date?: string | null
           id?: string
           is_target?: boolean
+          parent_task_id?: string | null
           priority?: Database["public"]["Enums"]["task_priority"]
           progress_count?: number
           status?: Database["public"]["Enums"]["task_status"]
@@ -977,6 +1140,13 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_parent_task_id_fkey"
+            columns: ["parent_task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
             referencedColumns: ["id"]
           },
         ]

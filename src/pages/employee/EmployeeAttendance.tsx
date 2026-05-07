@@ -2,13 +2,19 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Camera, MapPin, CheckCircle2, AlertTriangle, Loader2, Clock, RotateCcw } from 'lucide-react';
+import { Camera, MapPin, CheckCircle2, AlertTriangle, Loader2, Clock, RotateCcw, FileEdit, Send } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCompanySettings } from '@/hooks/useCompanySettings';
 import { haversineMeters, getCurrentPosition, formatTime } from '@/lib/helpers';
 import { StatusBadge } from '@/components/ui/status-badge';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { toast } from 'sonner';
+import { useNavigate } from 'react-router-dom';
 
 type Step = 'idle' | 'locating' | 'camera' | 'preview' | 'submitting';
 
@@ -22,8 +28,18 @@ export default function EmployeeAttendance() {
   const [photoBlob, setPhotoBlob] = useState<Blob | null>(null);
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showMoodDialog, setShowMoodDialog] = useState(false);
+  const [isSubmittingMood, setIsSubmittingMood] = useState(false);
+  const [showCorrectionForm, setShowCorrectionForm] = useState(false);
+  const [correctionDate, setCorrectionDate] = useState('');
+  const [correctionCheckIn, setCorrectionCheckIn] = useState('');
+  const [correctionCheckOut, setCorrectionCheckOut] = useState('');
+  const [correctionReason, setCorrectionReason] = useState('');
+  const [submittingCorrection, setSubmittingCorrection] = useState(false);
+  const [corrections, setCorrections] = useState<any[]>([]);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const navigate = useNavigate();
 
   const loadData = useCallback(async () => {
     if (!user) return;
@@ -33,6 +49,14 @@ export default function EmployeeAttendance() {
       supabase.from('attendance').select('*').eq('user_id', user.id).order('date', { ascending: false }).limit(10),
     ]);
     setToday(t.data); setHistory(h.data ?? []);
+    // Load correction requests
+    const { data: corrData } = await supabase
+      .from('attendance_corrections' as any)
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(10);
+    setCorrections((corrData as any) ?? []);
   }, [user]);
 
   useEffect(() => { loadData(); }, [loadData]);
@@ -105,8 +129,35 @@ export default function EmployeeAttendance() {
       if (photoUrl) URL.revokeObjectURL(photoUrl);
       setPhotoBlob(null); setPhotoUrl(null);
       await loadData(); setStep('idle');
+      
+      // If it's a check-in (not a late check-in updating something, though currently we just insert),
+      // we show the mood dialog!
+      setShowMoodDialog(true);
     } catch (e: any) {
       toast.error(e?.message ?? 'Failed to submit'); setStep('preview');
+    }
+  }
+
+  async function submitMood(score: number, note: string = '') {
+    if (!user?.companyId) return;
+    setIsSubmittingMood(true);
+    try {
+      const todayStr = new Date().toISOString().split('T')[0];
+      const { error } = await supabase.from('employee_moods' as any).insert({
+        company_id: user.companyId,
+        user_id: user.id,
+        date: todayStr,
+        score,
+        note
+      });
+      if (error) throw error;
+      toast.success('Thank you for sharing!');
+      setShowMoodDialog(false);
+      navigate('/employee');
+    } catch (e: any) {
+      toast.error('Failed to save mood');
+    } finally {
+      setIsSubmittingMood(false);
     }
   }
 
@@ -214,6 +265,122 @@ export default function EmployeeAttendance() {
             </div>
           )}
         </Card>
+
+        {/* Attendance Correction Request */}
+        <Card className="p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-heading font-semibold flex items-center gap-2">
+              <FileEdit className="h-4 w-4 text-primary" />
+              Attendance Corrections
+            </h3>
+            <Button variant="outline" size="sm" onClick={() => setShowCorrectionForm(!showCorrectionForm)}>
+              {showCorrectionForm ? 'Cancel' : 'Request Correction'}
+            </Button>
+          </div>
+          
+          {showCorrectionForm && (
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              if (!user?.companyId || !correctionDate || !correctionReason.trim()) return;
+              setSubmittingCorrection(true);
+              try {
+                const { error: err } = await supabase.from('attendance_corrections' as any).insert({
+                  company_id: user.companyId,
+                  user_id: user.id,
+                  date: correctionDate,
+                  requested_check_in: correctionCheckIn ? new Date(`${correctionDate}T${correctionCheckIn}`).toISOString() : null,
+                  requested_check_out: correctionCheckOut ? new Date(`${correctionDate}T${correctionCheckOut}`).toISOString() : null,
+                  reason: correctionReason.trim(),
+                  status: 'pending'
+                } as any);
+                if (err) throw err;
+                toast.success('Correction request submitted');
+                setCorrectionDate(''); setCorrectionCheckIn(''); setCorrectionCheckOut(''); setCorrectionReason('');
+                setShowCorrectionForm(false);
+                loadData();
+              } catch (err: any) {
+                toast.error(err?.message || 'Failed to submit');
+              } finally {
+                setSubmittingCorrection(false);
+              }
+            }} className="space-y-4 mb-6 p-4 rounded-xl border bg-muted/20">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="space-y-2">
+                  <Label>Date</Label>
+                  <Input type="date" required value={correctionDate} onChange={e => setCorrectionDate(e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Correct Check-in</Label>
+                  <Input type="time" value={correctionCheckIn} onChange={e => setCorrectionCheckIn(e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Correct Check-out</Label>
+                  <Input type="time" value={correctionCheckOut} onChange={e => setCorrectionCheckOut(e.target.value)} />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Reason for Correction</Label>
+                <Textarea required value={correctionReason} onChange={e => setCorrectionReason(e.target.value)} rows={2} placeholder="e.g., Face wasn't recognized due to low light" />
+              </div>
+              <Button type="submit" disabled={submittingCorrection} className="w-full">
+                {submittingCorrection ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Send className="h-4 w-4 mr-2" />}
+                Submit Correction Request
+              </Button>
+            </form>
+          )}
+
+          {corrections.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-4 text-center">No correction requests.</p>
+          ) : (
+            <div className="space-y-2">
+              {corrections.map((c: any) => (
+                <div key={c.id} className="flex items-center justify-between p-3 rounded-xl border bg-card">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium">{c.date}</p>
+                    <p className="text-xs text-muted-foreground truncate">{c.reason}</p>
+                  </div>
+                  <Badge variant="outline" className={
+                    c.status === 'approved' ? 'bg-success/10 text-success border-success/20'
+                    : c.status === 'rejected' ? 'bg-destructive/10 text-destructive border-destructive/20'
+                    : 'bg-warning/10 text-warning border-warning/20'
+                  }>
+                    {c.status}
+                  </Badge>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+        {/* Mood Tracker Dialog */}
+        <Dialog open={showMoodDialog} onOpenChange={setShowMoodDialog}>
+          <DialogContent className="sm:max-w-md text-center">
+            <DialogHeader>
+              <DialogTitle className="text-2xl font-bold">How are you feeling today?</DialogTitle>
+              <DialogDescription>
+                Your well-being matters to us. Let us know how you're starting your day.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="flex justify-center items-center gap-2 sm:gap-4 py-8">
+              {[
+                { score: 1, emoji: '😫', label: 'Terrible' },
+                { score: 2, emoji: '😟', label: 'Bad' },
+                { score: 3, emoji: '😐', label: 'Okay' },
+                { score: 4, emoji: '🙂', label: 'Good' },
+                { score: 5, emoji: '🤩', label: 'Great' }
+              ].map((mood) => (
+                <button
+                  key={mood.score}
+                  onClick={() => submitMood(mood.score)}
+                  disabled={isSubmittingMood}
+                  className="flex flex-col items-center gap-2 p-3 rounded-2xl hover:bg-muted transition-all hover:scale-110 active:scale-95 disabled:opacity-50"
+                >
+                  <span className="text-4xl">{mood.emoji}</span>
+                  <span className="text-xs font-medium text-muted-foreground">{mood.label}</span>
+                </button>
+              ))}
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </DashboardLayout>
   );
