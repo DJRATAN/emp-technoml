@@ -5,7 +5,7 @@ import type { Session, User as SbUser } from '@supabase/supabase-js';
 export type UserRole = 'super_admin' | 'admin' | 'employee';
 export type AccountStatus = 'pending' | 'approved' | 'rejected' | 'suspended';
 
-export interface AppCompany { id: string; name: string; slug: string; logoUrl?: string | null; themeColor?: string | null; }
+export interface AppCompany { id: string; name: string; slug: string; logoUrl?: string | null; themeColor?: string | null; planType: 'basic' | 'pro' | 'enterprise'; }
 
 export interface AppUser {
   id: string;
@@ -71,17 +71,23 @@ async function loadAppUser(sbUser: SbUser): Promise<AppUser | null> {
   if (companyRaw?.id) {
     const { data: bData } = await supabase
       .from('companies')
-      .select('logo_url, theme_color' as any)
+      .select('logo_url, theme_color, plan_type' as any)
       .eq('id', companyRaw.id)
       .maybeSingle();
-    if (bData) branding = { logoUrl: (bData as any).logo_url, themeColor: (bData as any).theme_color };
+    if (bData) branding = { 
+      logoUrl: (bData as any).logo_url, 
+      themeColor: (bData as any).theme_color,
+      planType: (bData as any).plan_type || 'basic'
+    };
   }
 
   const company: AppCompany | null = companyRaw ? { 
     id: companyRaw.id, 
     name: companyRaw.name, 
     slug: companyRaw.slug,
-    ...branding
+    planType: (branding as any).planType || 'basic',
+    logoUrl: branding.logoUrl,
+    themeColor: branding.themeColor
   } : null;
   
   const isOwner = companyRaw?.owner_id === sbUser.id;
@@ -132,62 +138,62 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const login = useCallback(async (companySlug: string, email: string, password: string) => {
     const slug = companySlug.trim().toLowerCase();
-    const { data: company } = await supabase.from('companies').select('id, status').eq('slug', slug).maybeSingle();
-    if (!company) return { error: `Company "${slug}" not found. Check the company code.` };
-    if (company.status !== 'active') return { error: 'This company account is not active. Contact support.' };
+    
+    // 1. Attempt authentication first
+    const { data: signInData, error: authError } = await supabase.auth.signInWithPassword({ 
+      email: email.trim(), 
+      password 
+    });
 
-    // Check if account is locked (Search by email only first)
-    const { data: profileCheck } = await supabase.from('profiles')
-      .select('id, is_active, locked_until, failed_login_count, company_id')
-      .eq('email', email.trim()).maybeSingle();
-
-    if (profileCheck) {
-      if (!(profileCheck as any).is_active) return { error: 'Your account has been deactivated. Contact your admin.' };
-      const lockedUntil = (profileCheck as any).locked_until;
-      if (lockedUntil && new Date(lockedUntil) > new Date()) {
-        const mins = Math.ceil((new Date(lockedUntil).getTime() - Date.now()) / 60000);
-        return { error: `Account locked. Try again in ${mins} minute(s).` };
-      }
-    }
-
-    const { data: signInData, error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
-
-    if (error || !signInData.user) {
-      // Increment failed login count
+    if (authError || !signInData.user) {
+      // Handle failed login
+      const { data: profileCheck } = await supabase.from('profiles')
+        .select('id, failed_login_count')
+        .eq('email', email.trim()).maybeSingle();
+      
       if (profileCheck) {
         const newCount = ((profileCheck as any).failed_login_count ?? 0) + 1;
-        const updates: any = { failed_login_count: newCount };
-        if (newCount >= 5) {
-          updates.locked_until = new Date(Date.now() + 30 * 60000).toISOString();
-        }
-        await supabase.from('profiles').update(updates).eq('id', (profileCheck as any).id);
+        await supabase.from('profiles').update({ failed_login_count: newCount }).eq('id', (profileCheck as any).id);
       }
-      return { error: error?.message ?? 'Login failed' };
+      return { error: authError?.message ?? 'Login failed' };
     }
 
+    // 2. Load the app user to check roles
     const u = await loadAppUser(signInData.user);
     if (!u) {
       await supabase.auth.signOut();
-      return { error: 'Account not found.' };
+      return { error: 'Account profile not found.' };
     }
 
-    // Relaxed check: Allow super_admin regardless of company selection,
-    // but check company matching for other roles.
-    if (u.role !== 'super_admin' && u.companyId !== company.id) {
+    // 3. Reset failed count and update login info (shared for all roles)
+    await supabase.from('profiles').update({
+      failed_login_count: 0, locked_until: null,
+      last_login_at: new Date().toISOString(),
+      last_login_device: navigator.userAgent,
+    } as any).eq('id', u.id);
+
+    // 4. Check for Super Admin bypass
+    if (u.role === 'super_admin') {
+      return { error: null };
+    }
+
+    // 5. For non-super admins, validate the company slug
+    const { data: company } = await supabase.from('companies').select('id, status').eq('slug', slug).maybeSingle();
+    if (!company) {
+      await supabase.auth.signOut();
+      return { error: `Company "${slug}" not found.` };
+    }
+    if (company.status !== 'active') {
+      await supabase.auth.signOut();
+      return { error: 'This company account is not active.' };
+    }
+
+    if (u.companyId !== company.id) {
       await supabase.auth.signOut();
       return { error: 'This account does not belong to this company.' };
     }
 
-    // Reset failed count on success & update last login (if profile exists)
-    if (u.id) {
-      await supabase.from('profiles').update({
-        failed_login_count: 0, locked_until: null,
-        last_login_at: new Date().toISOString(),
-        last_login_device: navigator.userAgent,
-      } as any).eq('id', u.id);
-    }
-
-    // Log successful login
+    // Log successful login for audit trail
     await supabase.from('login_logs' as any).insert({
       user_id: u.id, company_id: u.companyId, email: email.trim(),
       success: true, user_agent: navigator.userAgent,

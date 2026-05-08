@@ -1,0 +1,4 @@
+{
+  "action": "run_sql",
+  "sql": "SELECT r.role FROM public.user_roles r JOIN auth.users u ON r.user_id = u.id WHERE u.email = 'ratanprajapati1242@gmail.com';"
+}

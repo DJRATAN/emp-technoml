@@ -42,10 +42,38 @@ import AdminTasks from "./pages/admin/AdminTasks";
 import AdminLeave from "./pages/admin/AdminLeave";
 import AdminReports from "./pages/admin/AdminReports";
 import AdminSettings from "./pages/admin/AdminSettings";
+import SuperAdminDashboard from "./pages/super-admin/SuperAdminDashboard";
 import SuperAdminCompanies from "./pages/super-admin/SuperAdminCompanies";
 import NotFound from "./pages/NotFound";
 import { Loader2 } from "lucide-react";
-import { useEffect } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import { useEffect, useRef } from "react";
+
+function NavigationDebugger() {
+  const location = useLocation();
+  const { user, isAuthenticated } = useAuth();
+  const navigate = useNavigate();
+  const lastPath = useRef(location.pathname);
+
+  useEffect(() => {
+    console.log(`[Navigation] Path changed: ${lastPath.current} -> ${location.pathname}`);
+    
+    // If we hit /design-guide (likely from external tool), redirect to our actual dashboard
+    if (location.pathname.includes('design-guide')) {
+      console.warn('[Navigation] Intercepted rogue design-guide redirect. Returning to dashboard...');
+      
+      const home = !isAuthenticated || !user ? '/' 
+        : user.role === 'super_admin' ? '/super-admin' 
+        : (user.role === 'admin' ? '/admin' : '/employee');
+        
+      navigate(home, { replace: true });
+    }
+    
+    lastPath.current = location.pathname;
+  }, [location, navigate, user, isAuthenticated]);
+
+  return null;
+}
 
 const queryClient = new QueryClient();
 
@@ -99,7 +127,8 @@ function AppRoutes() {
       <Route path="/pending" element={<PendingApproval />} />
       <Route path="/onboarding" element={<OnboardingPage />} />
 
-      <Route path="/super-admin" element={<ProtectedRoute allow={['super_admin']}><SuperAdminCompanies /></ProtectedRoute>} />
+      <Route path="/super-admin" element={<ProtectedRoute allow={['super_admin']}><SuperAdminDashboard /></ProtectedRoute>} />
+      <Route path="/super-admin/companies" element={<ProtectedRoute allow={['super_admin']}><SuperAdminCompanies /></ProtectedRoute>} />
 
       <Route path="/employee" element={<ProtectedRoute allow={['employee']}><EmployeeDashboard /></ProtectedRoute>} />
       <Route path="/employee/attendance" element={<ProtectedRoute allow={['employee']}><EmployeeAttendance /></ProtectedRoute>} />
@@ -145,6 +174,7 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <AuthProvider>
+          <NavigationDebugger />
           <AppRoutes />
           <PolicyUpdateGuard />
         </AuthProvider>

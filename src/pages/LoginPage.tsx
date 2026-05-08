@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Building2, Mail, Lock, ArrowRight, ArrowLeft, Loader2, User as UserIcon, Phone, Eye, EyeOff } from 'lucide-react';
+import { Building2, Mail, Lock, ArrowRight, ArrowLeft, Loader2, User as UserIcon, Phone, Eye, EyeOff, Shield, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -10,7 +10,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
-type Step = 'company' | 'auth';
+type Step = 'company' | 'auth' | 'reset';
 type Mode = 'login' | 'signup';
 interface CompanyOption { id: string; name: string; slug: string; }
 
@@ -172,9 +172,47 @@ export default function LoginPage() {
                   <p className="text-xs text-muted-foreground">No matching companies. Try a different name or contact your admin.</p>
                 )}
               </div>
-              <p className="text-xs text-muted-foreground text-center pt-2">
-                Don't have a company yet? Ask your administrator.
-              </p>
+              <div className="flex flex-col items-center gap-4 pt-4 border-t">
+                <p className="text-xs text-muted-foreground text-center">
+                  Don't have a company yet? Ask your administrator.
+                </p>
+                <button type="button" 
+                  onClick={() => { setSelected({ id: 'platform', name: 'Platform Admin', slug: 'platform' }); setStep('auth'); }}
+                  className="text-xs font-medium text-primary hover:underline flex items-center gap-1.5"
+                >
+                  <Shield className="h-3 w-3" /> Are you a Platform Admin?
+                </button>
+                <button type="button" 
+                  onClick={() => setStep('reset')}
+                  className="text-[10px] text-muted-foreground hover:text-destructive transition-colors mt-2"
+                >
+                  Trouble logging in? Reset App State
+                </button>
+              </div>
+            </div>
+          ) : step === 'reset' ? (
+            <div className="space-y-6 text-center">
+              <div className="h-12 w-12 rounded-full bg-destructive/10 text-destructive flex items-center justify-center mx-auto">
+                <AlertTriangle className="h-6 w-6" />
+              </div>
+              <div>
+                <h2 className="font-heading text-xl font-semibold text-destructive">Reset Application</h2>
+                <p className="text-sm text-muted-foreground mt-2">
+                  This will clear all local data, sign you out, and refresh the app. Use this if you are stuck in a redirect loop.
+                </p>
+              </div>
+              <div className="flex flex-col gap-3">
+                <Button variant="destructive" onClick={() => {
+                  localStorage.clear();
+                  sessionStorage.clear();
+                  window.location.href = '/';
+                }}>
+                  Confirm Reset & Refresh
+                </Button>
+                <Button variant="ghost" onClick={() => setStep('company')}>
+                  Cancel
+                </Button>
+              </div>
             </div>
           ) : (
             <form onSubmit={mode === 'login' ? handleLogin : handleSignup} className="space-y-4">

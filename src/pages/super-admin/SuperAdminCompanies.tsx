@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, Plus, Building2, Users, Clock, Shield, UserCog, UserCheck, Lock } from 'lucide-react';
+import { Loader2, Plus, Building2, Users, Clock, Shield, UserCog, UserCheck, Lock, Globe } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface CompanyRow {
@@ -16,10 +16,34 @@ interface CompanyRow {
   slug: string;
   owner_id: string | null;
   status: string;
+  plan_type: 'basic' | 'pro' | 'enterprise';
   created_at: string;
   employee_count?: number;
   owner_name?: string;
 }
+
+const ALL_FEATURES = [
+  { key: 'chat_enabled', label: 'Team Chat', description: 'Enable realtime chat between employees' },
+  { key: 'tasks_enabled', label: 'Tasks Management', description: 'Assign and track tasks' },
+  { key: 'kudos_enabled', label: 'Kudos Wall', description: 'Employee recognition platform' },
+  { key: 'birthdays_enabled', label: 'Birthdays & Events', description: 'Celebrate team milestones' },
+  { key: 'helpdesk_enabled', label: 'IT Helpdesk', description: 'Ticketing system for internal support' },
+  { key: 'ai_analytics_enabled', label: 'AI Analytics', description: 'Smart insights and predictions' },
+  { key: 'payroll_export_enabled', label: 'Payroll Export', description: 'Export attendance to payroll formats' },
+  { key: 'multi_level_approvals_enabled', label: 'Multi-Level Approvals', description: 'Advanced approval workflows' },
+  { key: 'ip_whitelist_enabled', label: 'IP Whitelisting', description: 'Restrict access by IP address' },
+  { key: 'mock_gps_detection_enabled', label: 'Mock GPS Detection', description: 'Prevent fake location check-ins' },
+];
+
+const PLAN_DEFAULTS: Record<string, string[]> = {
+  basic: ['tasks_enabled', 'birthdays_enabled'],
+  pro: ['tasks_enabled', 'birthdays_enabled', 'chat_enabled', 'kudos_enabled', 'helpdesk_enabled'],
+  enterprise: [
+    'tasks_enabled', 'birthdays_enabled', 'chat_enabled', 'kudos_enabled', 
+    'helpdesk_enabled', 'ai_analytics_enabled', 'payroll_export_enabled', 
+    'multi_level_approvals_enabled', 'ip_whitelist_enabled', 'mock_gps_detection_enabled'
+  ]
+};
 
 export default function SuperAdminCompanies() {
   const [companies, setCompanies] = useState<CompanyRow[]>([]);
@@ -47,6 +71,12 @@ export default function SuperAdminCompanies() {
 
   const [pendingUsers, setPendingUsers] = useState<any[]>([]);
   const [pendingLoading, setPendingLoading] = useState(false);
+
+  const [featuresOpen, setFeaturesOpen] = useState(false);
+  const [configuringCompany, setConfiguringCompany] = useState<CompanyRow | null>(null);
+  const [currentFeatures, setCurrentFeatures] = useState<any>({});
+  const [featuresLoading, setFeaturesLoading] = useState(false);
+  const [savingFeatures, setSavingFeatures] = useState(false);
 
   const loadCompanyUsers = async (company: CompanyRow) => {
     setManagingCompany(company);
@@ -133,24 +163,43 @@ export default function SuperAdminCompanies() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const { data: cs } = await supabase.from('companies').select('*').order('created_at', { ascending: false });
-    const { data: profs } = await supabase.from('profiles').select('id, full_name, company_id');
-    
-    const counts = new Map<string, number>();
-    const names = new Map<string, string>();
-    
-    (profs ?? []).forEach((p) => {
-      counts.set(p.company_id, (counts.get(p.company_id) ?? 0) + 1);
-      names.set(p.id, p.full_name);
-    });
-    
-    setCompanies((cs ?? []).map((c) => ({ 
-      ...c, 
-      employee_count: counts.get(c.id) ?? 0,
-      owner_name: names.get(c.owner_id) || 'Not Set'
-    })));
-    setLoading(false);
-    loadPending();
+    try {
+      const { data: cs } = await supabase.from('companies').select('*').order('created_at', { ascending: false });
+      
+      // Efficiently count employees per company using a single query if possible, 
+      // or map them if the list is small enough. For now, let's use the count feature.
+      const companiesWithCounts = await Promise.all((cs ?? []).map(async (c) => {
+        const { count } = await supabase
+          .from('profiles')
+          .select('*', { count: 'exact', head: true })
+          .eq('company_id', c.id);
+        
+        // Also get owner name
+        let ownerName = 'Not Set';
+        if (c.owner_id) {
+          const { data: owner } = await supabase
+            .from('profiles')
+            .select('full_name')
+            .eq('id', c.owner_id)
+            .maybeSingle();
+          if (owner) ownerName = owner.full_name;
+        }
+
+        return { 
+          ...c, 
+          employee_count: count ?? 0,
+          owner_name: ownerName
+        };
+      }));
+      
+      setCompanies(companiesWithCounts);
+    } catch (err) {
+      console.error('Error loading companies:', err);
+      toast.error('Failed to load companies');
+    } finally {
+      setLoading(false);
+      loadPending();
+    }
   }, [loadPending]);
 
   async function approveUser(id: string) {
@@ -159,6 +208,49 @@ export default function SuperAdminCompanies() {
     toast.success('User approved');
     load();
   }
+
+  const loadFeatures = async (company: CompanyRow) => {
+    setConfiguringCompany(company);
+    setFeaturesOpen(true);
+    setFeaturesLoading(true);
+    const { data } = await supabase.from('company_features' as any).select('*').eq('company_id', company.id).maybeSingle();
+    setCurrentFeatures(data || {});
+    setFeaturesLoading(false);
+  };
+
+  const updateFeature = async (key: string, value: boolean) => {
+    if (!configuringCompany) return;
+    setCurrentFeatures(prev => ({ ...prev, [key]: value }));
+  };
+
+  const applyPlanDefaults = (plan: string) => {
+    if (!configuringCompany) return;
+    const defaults = PLAN_DEFAULTS[plan] || [];
+    const newFeatures: any = {};
+    ALL_FEATURES.forEach(f => {
+      newFeatures[f.key] = defaults.includes(f.key);
+    });
+    setCurrentFeatures(newFeatures);
+    setConfiguringCompany({ ...configuringCompany, plan_type: plan as any });
+  };
+
+  const saveAllFeatures = async () => {
+    if (!configuringCompany) return;
+    setSavingFeatures(true);
+    const { error } = await supabase.from('company_features' as any).upsert({
+      company_id: configuringCompany.id,
+      ...currentFeatures
+    });
+    
+    // Also update plan type
+    await supabase.from('companies').update({ plan_type: configuringCompany.plan_type }).eq('id', configuringCompany.id);
+    
+    setSavingFeatures(false);
+    if (error) return toast.error(error.message);
+    toast.success('Features updated');
+    setFeaturesOpen(false);
+    load();
+  };
 
   useEffect(() => { load(); }, [load]);
 
@@ -217,8 +309,8 @@ export default function SuperAdminCompanies() {
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-heading font-bold">Companies</h1>
-            <p className="text-muted-foreground">Manage all tenant organizations on the platform</p>
+            <h1 className="text-2xl font-heading font-bold">Platform Administration</h1>
+            <p className="text-muted-foreground">Global control for {companies.length} tenant organizations</p>
           </div>
           <div className="flex gap-2">
             <Button variant="outline" onClick={load} disabled={loading}>
@@ -226,43 +318,86 @@ export default function SuperAdminCompanies() {
             </Button>
             <Dialog open={open} onOpenChange={setOpen}>
               <DialogTrigger asChild>
-                <Button><Plus className="h-4 w-4 mr-2" />New Company</Button>
+                <Button className="shadow-lg shadow-primary/20"><Plus className="h-4 w-4 mr-2" />New Organization</Button>
               </DialogTrigger>
-              <DialogContent>
-                <DialogHeader><DialogTitle>Create company + admin owner</DialogTitle></DialogHeader>
-                <form onSubmit={createCompany} className="space-y-3">
-                  <div className="space-y-1.5">
-                    <Label>Company name</Label>
-                    <Input required value={name} onChange={(e) => {
-                      const v = e.target.value;
-                      setName(v);
-                      setSlug(v.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40));
-                    }} />
+              <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2">
+                    <Building2 className="h-5 w-5 text-primary" />
+                    Provision New Company
+                  </DialogTitle>
+                </DialogHeader>
+                <form onSubmit={createCompany} className="space-y-4 pt-2">
+                  <div className="grid gap-4">
+                    <div className="space-y-2">
+                      <Label>Organization Name</Label>
+                      <Input required placeholder="e.g. Acme Corp" value={name} onChange={(e) => {
+                        const v = e.target.value;
+                        setName(v);
+                        setSlug(v.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40));
+                      }} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Company Slug / Code</Label>
+                      <div className="relative">
+                        <Input readOnly value={slug} className="bg-muted font-mono pr-10" />
+                        <Lock className="h-3 w-3 absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                      </div>
+                      <p className="text-[10px] text-muted-foreground">This unique code is used by employees to sign in.</p>
+                    </div>
+                    <div className="border-t pt-4 space-y-3">
+                      <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Primary Administrator</Label>
+                      <div className="space-y-2">
+                        <Label className="text-xs">Full Name</Label>
+                        <Input required placeholder="John Doe" value={ownerName} onChange={(e) => setOwnerName(e.target.value)} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-xs">Work Email</Label>
+                        <Input type="email" required placeholder="admin@company.com" value={ownerEmail} onChange={(e) => setOwnerEmail(e.target.value)} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-xs">Initial Password</Label>
+                        <Input type="password" required minLength={6} value={ownerPassword} onChange={(e) => setOwnerPassword(e.target.value)} />
+                      </div>
+                    </div>
                   </div>
-                  <div className="space-y-1.5">
-                    <Label>Company code (auto)</Label>
-                    <Input readOnly value={slug} className="bg-muted font-mono" placeholder="auto-generated from name" />
-                    <p className="text-xs text-muted-foreground">Auto-generated from the company name. Employees use this code to sign in.</p>
-                  </div>
-                  <div className="border-t pt-3 space-y-1.5">
-                    <Label>Owner / Admin name</Label>
-                    <Input required value={ownerName} onChange={(e) => setOwnerName(e.target.value)} />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label>Owner email</Label>
-                    <Input type="email" required value={ownerEmail} onChange={(e) => setOwnerEmail(e.target.value)} />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label>Initial password (min 6)</Label>
-                    <Input type="password" required minLength={6} value={ownerPassword} onChange={(e) => setOwnerPassword(e.target.value)} />
-                  </div>
-                  <Button type="submit" className="w-full" disabled={submitting}>
-                    {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Create'}
+                  <Button type="submit" className="w-full mt-2" disabled={submitting}>
+                    {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Provision Organization'}
                   </Button>
                 </form>
               </DialogContent>
             </Dialog>
           </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Card className="p-4 bg-primary/5 border-primary/10 flex items-center gap-4">
+            <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
+              <Globe className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Total Tenants</p>
+              <p className="text-2xl font-bold">{companies.length}</p>
+            </div>
+          </Card>
+          <Card className="p-4 bg-emerald-500/5 border-emerald-500/10 flex items-center gap-4">
+            <div className="h-10 w-10 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-600">
+              <Users className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Platform Users</p>
+              <p className="text-2xl font-bold">{companies.reduce((acc, c) => acc + (c.employee_count || 0), 0)}</p>
+            </div>
+          </Card>
+          <Card className="p-4 bg-amber-500/5 border-amber-500/10 flex items-center gap-4">
+            <div className="h-10 w-10 rounded-xl bg-amber-500/10 flex items-center justify-center text-amber-600">
+              <Shield className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Active Status</p>
+              <p className="text-2xl font-bold">Healthy</p>
+            </div>
+          </Card>
         </div>
 
         {pendingUsers.length > 0 && (
@@ -386,6 +521,67 @@ export default function SuperAdminCompanies() {
           </DialogContent>
         </Dialog>
 
+        {/* Features Management Dialog */}
+        <Dialog open={featuresOpen} onOpenChange={setFeaturesOpen}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Shield className="h-5 w-5 text-primary" />
+                Feature Gating - {configuringCompany?.name}
+              </DialogTitle>
+            </DialogHeader>
+            
+            {featuresLoading ? (
+              <div className="py-12 text-center"><Loader2 className="h-6 w-6 animate-spin mx-auto text-primary" /></div>
+            ) : (
+              <div className="space-y-6 pt-4">
+                <div className="grid gap-4">
+                  <div className="space-y-2">
+                    <Label>Subscription Tier</Label>
+                    <div className="flex gap-2">
+                      {['basic', 'pro', 'enterprise'].map((t) => (
+                        <Button 
+                          key={t}
+                          type="button"
+                          variant={configuringCompany?.plan_type === t ? 'default' : 'outline'}
+                          className="flex-1 capitalize"
+                          onClick={() => applyPlanDefaults(t)}
+                        >
+                          {t}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="border-t pt-4">
+                    <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-4 block">Enabled Modules</Label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {ALL_FEATURES.map((f) => (
+                        <div key={f.key} className="flex items-center justify-between p-3 rounded-xl border bg-muted/20">
+                          <div className="min-w-0 pr-2">
+                            <p className="text-sm font-semibold">{f.label}</p>
+                            <p className="text-[10px] text-muted-foreground line-clamp-1">{f.description}</p>
+                          </div>
+                          <div 
+                            className={`h-5 w-10 rounded-full cursor-pointer transition-colors relative ${currentFeatures[f.key] ? 'bg-primary' : 'bg-muted'}`}
+                            onClick={() => updateFeature(f.key, !currentFeatures[f.key])}
+                          >
+                            <div className={`absolute top-1 left-1 h-3 w-3 rounded-full bg-white transition-transform ${currentFeatures[f.key] ? 'translate-x-5' : ''}`} />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                
+                <Button className="w-full" onClick={saveAllFeatures} disabled={savingFeatures}>
+                  {savingFeatures ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Apply Configuration'}
+                </Button>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
+
         <Card className="p-6">
           {loading ? (
             <div className="text-center py-12"><Loader2 className="h-6 w-6 animate-spin text-primary mx-auto" /></div>
@@ -400,7 +596,12 @@ export default function SuperAdminCompanies() {
                       <Building2 className="h-6 w-6 text-primary" />
                     </div>
                     <div className="min-w-0">
-                      <h4 className="font-heading font-bold text-lg truncate leading-tight">{c.name}</h4>
+                      <h4 className="font-heading font-bold text-lg truncate leading-tight flex items-center gap-2">
+                        {c.name}
+                        <Badge variant="outline" className="text-[10px] uppercase py-0 px-1.5 h-4 font-bold border-primary/20 text-primary bg-primary/5">
+                          {c.plan_type || 'basic'}
+                        </Badge>
+                      </h4>
                       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1">
                         <p className="text-xs text-muted-foreground font-mono bg-muted/50 px-2 py-0.5 rounded">{c.slug}</p>
                         <p className="text-xs text-muted-foreground flex items-center gap-1.5">
@@ -420,6 +621,10 @@ export default function SuperAdminCompanies() {
                       </Badge>
                     </div>
                     
+                    <Button size="sm" variant="outline" className="gap-1.5" onClick={() => loadFeatures(c)}>
+                      <Shield className="h-4 w-4" /> Features
+                    </Button>
+
                     <Button size="sm" variant="outline" className="gap-1.5" onClick={() => loadCompanyUsers(c)}>
                       <UserCog className="h-4 w-4" /> Users
                     </Button>

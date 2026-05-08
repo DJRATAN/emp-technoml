@@ -11,6 +11,9 @@ export interface CompanyFeatures {
   multi_level_approvals_enabled: boolean;
   ip_whitelist_enabled: boolean;
   mock_gps_detection_enabled: boolean;
+  ai_analytics_enabled: boolean;
+  payroll_export_enabled: boolean;
+  tasks_enabled: boolean;
 }
 
 const DEFAULTS: Omit<CompanyFeatures, 'company_id'> = {
@@ -21,6 +24,9 @@ const DEFAULTS: Omit<CompanyFeatures, 'company_id'> = {
   multi_level_approvals_enabled: false,
   ip_whitelist_enabled: false,
   mock_gps_detection_enabled: false,
+  ai_analytics_enabled: false,
+  payroll_export_enabled: false,
+  tasks_enabled: true,
 };
 
 export function useCompanyFeatures() {

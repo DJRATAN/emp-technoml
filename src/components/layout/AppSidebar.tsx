@@ -16,21 +16,31 @@ import { useCompanyFeatures } from '@/hooks/useCompanyFeatures';
 
 export function AppSidebar() {
   const { user } = useAuth();
-  const { features } = useCompanyFeatures();
+  const { features, loading } = useCompanyFeatures();
   const { state } = useSidebar();
   const collapsed = state === 'collapsed';
+  
+  const plan = user?.company?.planType || 'basic';
+  const isPro = plan === 'pro' || plan === 'enterprise';
+  const isEnterprise = plan === 'enterprise';
+
+  // Strict visibility helper for database-only flags
+  const isEnabled = (key: keyof typeof features) => {
+    if (loading) return false;
+    return !!features?.[key];
+  };
 
   const employeeMenu = [
     { title: 'Dashboard', url: '/employee', icon: LayoutDashboard, show: true },
     { title: 'Attendance', url: '/employee/attendance', icon: Clock, show: true },
-    { title: 'Tasks', url: '/employee/tasks', icon: CheckSquare, show: true },
+    { title: 'Tasks', url: '/employee/tasks', icon: CheckSquare, show: true }, // Standard for all
     { title: 'My Targets', url: '/employee/targets', icon: Target, show: true },
     { title: 'Leave', url: '/employee/leave', icon: CalendarDays, show: true },
     { title: 'Performance', url: '/employee/performance', icon: TrendingUp, show: true },
-    { title: 'Kudos', url: '/employee/kudos', icon: Award, show: features?.kudos_enabled !== false },
-    { title: 'Chat', url: '/employee/chat', icon: MessageSquare, show: features?.chat_enabled !== false },
+    { title: 'Kudos', url: '/employee/kudos', icon: Award, show: isPro }, // Plan-locked
+    { title: 'Chat', url: '/employee/chat', icon: MessageSquare, show: isPro }, // Plan-locked
     { title: 'Office Updates', url: '/employee/inbox', icon: Mail, show: true },
-    { title: 'Helpdesk', url: '/employee/helpdesk', icon: LifeBuoy, show: features?.helpdesk_enabled !== false },
+    { title: 'Helpdesk', url: '/employee/helpdesk', icon: LifeBuoy, show: isPro }, // Plan-locked
     { title: 'Profile', url: '/employee/profile', icon: User, show: true },
   ].filter(i => i.show);
 
@@ -42,10 +52,10 @@ export function AppSidebar() {
     { title: 'Tasks', url: '/admin/tasks', icon: CheckSquare, show: true },
     { title: 'Targets', url: '/admin/targets', icon: Target, show: true },
     { title: 'Leave Requests', url: '/admin/leave', icon: CalendarDays, show: true },
-    { title: 'Helpdesk', url: '/admin/helpdesk', icon: LifeBuoy, show: features?.helpdesk_enabled !== false },
+    { title: 'Helpdesk', url: '/admin/helpdesk', icon: LifeBuoy, show: isPro },
     { title: 'Communication', url: '/admin/communication', icon: Megaphone, show: true },
-    { title: 'Wellbeing', url: '/admin/wellbeing', icon: HeartPulse, show: true },
-    { title: 'Payroll', url: '/admin/payroll', icon: DollarSign, show: true },
+    { title: 'Wellbeing', url: '/admin/wellbeing', icon: HeartPulse, show: isEnterprise }, // Enterprise-locked
+    { title: 'Payroll', url: '/admin/payroll', icon: DollarSign, show: isEnterprise }, // Enterprise-locked
     { title: 'Audit Trail', url: '/admin/audit', icon: Shield, show: true },
     { title: 'Permissions', url: '/admin/permissions', icon: Shield, show: true },
     { title: 'Corrections', url: '/admin/corrections', icon: Clock, show: true },
@@ -56,7 +66,8 @@ export function AppSidebar() {
   ].filter(i => i.show);
 
   const superAdminMenu = [
-    { title: 'Companies', url: '/super-admin', icon: Globe },
+    { title: 'Dashboard', url: '/super-admin', icon: LayoutDashboard },
+    { title: 'Companies', url: '/super-admin/companies', icon: Globe },
     { title: 'My Company', url: '/admin', icon: Building2 },
   ];
 

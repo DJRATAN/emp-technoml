@@ -15,13 +15,20 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     const today = new Date().toISOString().split('T')[0];
+    
+    // Helper to apply company filter if present
+    const scope = (query: any) => {
+      if (user?.companyId) return query.eq('company_id', user.companyId);
+      return query;
+    };
+
     Promise.all([
-      supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('status', 'approved'),
-      supabase.from('attendance').select('id', { count: 'exact', head: true }).eq('date', today),
-      supabase.from('leave_requests').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
-      supabase.from('tasks').select('id', { count: 'exact', head: true }).neq('status', 'completed'),
-      supabase.from('attendance').select('date, status').gte('date', new Date(Date.now() - 7 * 86400000).toISOString().split('T')[0]),
-      supabase.from('tasks').select('status, created_at').gte('created_at', new Date(Date.now() - 7 * 86400000).toISOString()),
+      scope(supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('status', 'approved')),
+      scope(supabase.from('attendance').select('id', { count: 'exact', head: true }).eq('date', today)),
+      scope(supabase.from('leave_requests').select('id', { count: 'exact', head: true }).eq('status', 'pending')),
+      scope(supabase.from('tasks').select('id', { count: 'exact', head: true }).neq('status', 'completed')),
+      scope(supabase.from('attendance').select('date, status').gte('date', new Date(Date.now() - 7 * 86400000).toISOString().split('T')[0])),
+      scope(supabase.from('tasks').select('status, created_at').gte('created_at', new Date(Date.now() - 7 * 86400000).toISOString())),
     ]).then(([emp, att, leave, tasks, trendData, taskData]) => {
       setStats({ total: emp.count ?? 0, present: att.count ?? 0, pendingLeave: leave.count ?? 0, activeTasks: tasks.count ?? 0 });
       const map: Record<string, { date: string; present: number; late: number }> = {};
@@ -31,23 +38,27 @@ export default function AdminDashboard() {
       });
       setTrend(Object.values(map).sort((a, b) => a.date.localeCompare(b.date)));
       const tmap: Record<string, { day: string; created: number; completed: number }> = {};
-      (taskData.data ?? []).forEach((r) => {
+      (taskData.data ?? []).forEach((r: any) => {
         const d = r.created_at.split('T')[0];
         tmap[d] = tmap[d] ?? { day: d.slice(5), created: 0, completed: 0 };
         tmap[d].created++; if (r.status === 'completed') tmap[d].completed++;
       });
       setTaskTrend(Object.values(tmap).sort((a, b) => a.day.localeCompare(b.day)));
     });
-  }, []);
+  }, [user?.companyId]);
 
   return (
     <DashboardLayout>
       <div className="space-y-6">
         <div>
           <h1 className="text-2xl font-heading font-bold">
-            {user?.isOwner ? 'Administrator Dashboard' : 'Admin Dashboard'}
+            {user?.role === 'super_admin' && !user.companyId ? 'Platform Overview' : (user?.isOwner ? 'Administrator Dashboard' : 'Admin Dashboard')}
           </h1>
-          <p className="text-muted-foreground">Welcome back, {user?.name.split(' ')[0]} 👋</p>
+          <p className="text-muted-foreground">
+            {user?.role === 'super_admin' && !user.companyId 
+              ? 'Aggregated insights across all tenant organizations.' 
+              : `Welcome back, ${user?.name.split(' ')[0]} 👋`}
+          </p>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <StatCard label="Total Employees" value={stats.total} icon={Users} description="Approved accounts" />
