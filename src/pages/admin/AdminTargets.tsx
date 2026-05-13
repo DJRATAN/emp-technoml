@@ -38,14 +38,29 @@ export default function AdminTargets() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [{ data: emps }, { data: tgts }] = await Promise.all([
-      supabase.from('profiles').select('id, full_name, email').eq('status', 'approved').order('full_name'),
-      supabase.from('loan_targets').select('id, user_id, bank, target, achieved, month').eq('month', monthDb(month)),
+    const profilesQuery = supabase.from('profiles').select('id, full_name, email').eq('status', 'approved').order('full_name');
+    if (user?.companyId) profilesQuery.eq('company_id', user.companyId);
+
+    const targetsQuery = supabase.from('loan_targets').select('id, user_id, bank, target, achieved, month').eq('month', monthDb(month));
+    if (user?.companyId) targetsQuery.eq('company_id', user.companyId);
+
+    const [{ data: emps }, { data: tgts }, { data: roles }] = await Promise.all([
+      profilesQuery,
+      targetsQuery,
+      supabase.from('user_roles').select('user_id, role')
     ]);
-    setEmployees((emps as Profile[]) ?? []);
+
+    const roleMap = new Map((roles ?? []).map((ur: any) => [ur.user_id, ur.role]));
+    
+    let allEmps = ((emps as Profile[]) ?? []).filter(prof => prof.id !== user?.id);
+    if (user && !user.isOwner && user.role === 'admin') {
+      allEmps = allEmps.filter(emp => roleMap.get(emp.id) === 'employee');
+    }
+
+    setEmployees(allEmps);
     setRows((tgts as Row[]) ?? []);
     setLoading(false);
-  }, [month]);
+  }, [month, user]);
 
   useEffect(() => { load(); }, [load]);
 

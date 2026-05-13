@@ -37,7 +37,7 @@ export default function EmployeeInbox() {
     if (!user) return;
     const { data } = await supabase.from('admin_messages' as any)
       .select('*')
-      .eq('receiver_id', user.id)
+      .or(`receiver_id.eq.${user.id},sender_id.eq.${user.id}`)
       .order('created_at', { ascending: true }); // chronological for chat
       
     // Filter expired and future scheduled messages
@@ -55,13 +55,18 @@ export default function EmployeeInbox() {
 
   // Realtime
   useEffect(() => {
-    if (!user) return;
+    if (!user?.companyId) return;
     const channel = supabase.channel('emp-inbox')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'admin_messages', filter: `receiver_id=eq.${user.id}` },
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'admin_messages', 
+        filter: `company_id=eq.${user.companyId}` 
+      },
         () => loadMessages()
       ).subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [user, loadMessages]);
+  }, [user?.companyId, loadMessages]);
 
   useEffect(() => {
     // Scroll to bottom of chat when messages change

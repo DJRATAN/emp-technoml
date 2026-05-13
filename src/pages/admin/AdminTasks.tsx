@@ -207,6 +207,8 @@ export default function AdminTasks() {
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [adding, setAdding] = useState(false);
   const [newTitle, setNewTitle] = useState('');
+  const [showAll, setShowAll] = useState(false);
+  const [hiddenCount, setHiddenCount] = useState(0);
   const newInputRef = useRef<HTMLInputElement>(null);
 
   // Upload state
@@ -222,34 +224,56 @@ export default function AdminTasks() {
 
   /* ── data loading ─────────────────────────────────────────────── */
   const load = useCallback(async () => {
+    if (!user) return;
+    setLoading(true);
+
     const profilesQuery = supabase.from('profiles').select('id, full_name').eq('status', 'approved').order('full_name');
-    // Filter employees by the admin's company so other tenants are never shown
     if (user?.companyId) profilesQuery.eq('company_id', user.companyId);
 
-    const [t, p] = await Promise.all([
-      supabase.from('tasks').select('*').order('created_at', { ascending: false }),
+    const { data: t, error: tErr } = await supabase.from('tasks').select('*').order('created_at', { ascending: false });
+    
+    console.log('[AdminTasks Debug] User:', { id: user?.id, role: user?.role, companyId: user?.companyId });
+    console.log('[AdminTasks Debug] Raw count from DB:', t?.length, tErr);
+
+    const [p, r] = await Promise.all([
       profilesQuery,
+      supabase.from('user_roles').select('user_id, role')
     ]);
     const profMap = new Map((p.data ?? []).map((e: any) => [e.id, e]));
-    // Filter out any tasks with null id to prevent update-all bugs
-    const validTasks = ((t.data ?? []) as any[]).filter(task => {
-      if (!task.id) { console.warn('Task missing id:', task); return false; }
-      return true;
+    const roleMap = new Map((r.data ?? []).map((ur: any) => [ur.user_id, ur.role]));
+
+    let hCount = 0;
+    const validTasks = ((t ?? []) as any[]).filter(task => {
+      if (!task.id) return false;
+      
+      const taskCoId = String(task.company_id || '');
+      const userCoId = String(user?.companyId || '');
+      
+      const isMatch = !task.company_id || taskCoId === userCoId;
+      console.log(`[AdminTasks Debug] Task ${task.id}: company_id=${task.company_id}, match=${isMatch}`);
+      return isMatch;
     });
     const tasksData = validTasks.map(task => ({
       ...task,
       profiles: task.assigned_to ? profMap.get(task.assigned_to) : undefined,
+      assigner: task.assigned_by === user?.id ? { full_name: user?.name } : (task.assigned_by ? profMap.get(task.assigned_by) : undefined),
     }));
     setTasks(tasksData as Task[]);
-    setEmployees((p.data as Emp[]) ?? []);
+
+    let allProfiles = ((p.data as Emp[]) ?? []).filter(prof => prof.id !== user?.id);
+    if (user && !user.isOwner && user.role === 'admin') {
+      allProfiles = allProfiles.filter(emp => roleMap.get(emp.id) === 'employee');
+    }
+    
+    setEmployees(allProfiles);
     setLoading(false);
-  }, [user?.companyId]);
+  }, [user]);
 
   useEffect(() => { load(); }, [load]);
 
   /* ── filtering & sorting ──────────────────────────────────────── */
   const filtered = useMemo(() => {
-    let result = tasks.filter(t => !t.is_target);
+    let result = [...tasks];
     if (filterStatus !== 'all') result = result.filter(t => t.status === filterStatus);
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
@@ -442,6 +466,7 @@ export default function AdminTasks() {
     { key: 'status', label: 'Status', width: '140px' },
     { key: 'priority', label: 'Priority', width: '120px' },
     { key: 'assignee', label: 'Assignee', width: 'minmax(160px, 1fr)' },
+    { key: 'assigned_by', label: 'Assigned By', width: '140px' },
     { key: 'due', label: 'Due Date', width: '140px' },
     { key: 'actions', label: '', width: '50px' },
   ];
@@ -449,18 +474,29 @@ export default function AdminTasks() {
   const gridTemplate = `40px ${columns.map(c => c.width).join(' ')}`;
 
   /* ── stats ────────────────────────────────────────────────────── */
-  const regularTasks = tasks.filter(t => !t.is_target);
   const stats = {
-    total: regularTasks.length,
-    todo: regularTasks.filter(t => t.status === 'pending').length,
-    progress: regularTasks.filter(t => t.status === 'in_progress').length,
-    done: regularTasks.filter(t => t.status === 'completed').length,
+    total: tasks.length,
+    todo: tasks.filter(t => t.status === 'pending').length,
+    progress: tasks.filter(t => t.status === 'in_progress').length,
+    done: tasks.filter(t => t.status === 'completed').length,
   };
 
   /* ── render ───────────────────────────────────────────────────── */
   return (
     <DashboardLayout>
       <div className="space-y-5">
+        {/* DEBUG ALERT - REMOVE LATER */}
+        <div className="bg-destructive/10 border-2 border-destructive p-4 rounded-xl flex items-center justify-between gap-4 animate-pulse">
+          <div className="flex items-center gap-3">
+            <AlertCircle className="h-6 w-6 text-destructive" />
+            <div>
+              <p className="font-bold text-destructive">DEBUG MODE ACTIVE</p>
+              <p className="text-xs font-mono">UID: {user?.id?.slice(0,8)}... | Role: {user?.role} | CoID: {user?.companyId || 'NULL'} | Raw Tasks: {tasks.length}</p>
+            </div>
+          </div>
+          <Button size="sm" variant="destructive" onClick={() => load()}>Reload Data</Button>
+        </div>
+
         {/* Header */}
         <div className="flex items-center justify-between gap-4 flex-wrap">
           <div>
@@ -502,6 +538,12 @@ export default function AdminTasks() {
               placeholder="Search tasks..." className="w-full h-9 pl-9 pr-3 text-sm rounded-lg border bg-card outline-none focus:ring-2 focus:ring-primary/30 transition-all"
             />
           </div>
+
+          <div className="flex items-center gap-2 bg-muted/20 px-3 py-1 rounded-lg border border-border/50">
+            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">System View</span>
+            <Checkbox checked={showAll} onCheckedChange={(v) => { setShowAll(!!v); load(); }} id="show-all" />
+            <label htmlFor="show-all" className="text-xs cursor-pointer select-none font-medium">Show All Data</label>
+          </div>
           <div className="flex items-center gap-1.5">
             <Filter className="w-3.5 h-3.5 text-muted-foreground" />
             {(['all', 'pending', 'in_progress', 'completed'] as const).map(s => (
@@ -518,6 +560,18 @@ export default function AdminTasks() {
             </Button>
           )}
         </div>
+
+        {hiddenCount > 0 && !showAll && (
+          <div className="bg-amber-50 border border-amber-200 p-3 rounded-xl flex items-center justify-between gap-3 text-amber-800 text-xs animate-in slide-in-from-top-2 duration-300">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="h-4 w-4 text-amber-600" />
+              <span><strong>{hiddenCount} tasks</strong> are hidden because their Company ID does not match yours.</span>
+            </div>
+            <Button size="sm" variant="outline" className="h-7 text-[10px] border-amber-300 bg-amber-100/50 hover:bg-amber-100 text-amber-900" onClick={() => { setShowAll(true); load(); }}>
+              Show All Anyway
+            </Button>
+          </div>
+        )}
 
         {/* Spreadsheet grid */}
         <div className="rounded-xl border bg-card overflow-hidden shadow-sm">
@@ -603,6 +657,13 @@ export default function AdminTasks() {
                     <AssigneeCell key={`assignee-${task.id}`} value={task.assigned_to} employees={employees}
                       onChange={id => updateField(task.id, 'assigned_to', id)}
                     />
+                  </div>
+
+                  {/* Assigned By */}
+                  <div className="border-r border-border/30 py-1.5 px-3">
+                    <span className="text-xs text-muted-foreground whitespace-nowrap truncate block">
+                      {(task as any).assigner?.full_name || 'System'}
+                    </span>
                   </div>
 
                   {/* Due date */}
