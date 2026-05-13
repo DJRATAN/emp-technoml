@@ -34,9 +34,30 @@ export default function AdminEmployees() {
   const [lastToken, setLastToken] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    const { data } = await supabase.from('profiles').select('id, full_name, email, phone, department, job_title, status').order('created_at', { ascending: false });
-    setProfiles((data as Profile[]) ?? []); setLoading(false);
+    // Get admin's company ID
+    const { data: authData } = await supabase.auth.getUser();
+    const adminId = authData?.user?.id;
+    if (!adminId) return setLoading(false);
+
+    const { data: adminProf } = await supabase
+      .from('profiles')
+      .select('company_id')
+      .eq('id', adminId)
+      .single() as any;
+    const companyId = adminProf?.company_id;
+
+    let query = supabase
+      .from('profiles')
+      .select('id, full_name, email, phone, department, job_title, status');
+    if (companyId) {
+      query = query.eq('company_id', companyId);
+    }
+    const { data } = await query.order('created_at', { ascending: false });
+    setProfiles((data as Profile[]) ?? []);
+    setLoading(false);
   }, []);
+
+
 
   useEffect(() => { load(); }, [load]);
 
@@ -202,7 +223,7 @@ export default function AdminEmployees() {
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead><tr className="text-left text-muted-foreground border-b">
-                  <th className="py-2 pr-4">Name</th><th className="py-2 pr-4">Email</th><th className="py-2 pr-4">Department</th>
+                  <th className="py-2 pr-4">Name</th><th className="py-2 pr-4">Email</th><th className="py-2 pr-4">Phone</th><th className="py-2 pr-4">Department</th>
                   <th className="py-2 pr-4">Title</th><th className="py-2 pr-4">Status</th><th className="py-2">Actions</th>
                 </tr></thead>
                 <tbody>
@@ -210,6 +231,7 @@ export default function AdminEmployees() {
                     <tr key={p.id} className="border-b last:border-0">
                       <td className="py-3 pr-4 font-medium">{p.full_name}</td>
                       <td className="py-3 pr-4 text-muted-foreground">{p.email}</td>
+                      <td className="py-3 pr-4">{p.phone ?? '—'}</td>
                       <td className="py-3 pr-4">{p.department ?? '—'}</td>
                       <td className="py-3 pr-4">{p.job_title ?? '—'}</td>
                       <td className="py-3 pr-4"><StatusBadge status={p.status === 'approved' ? 'Active' : p.status === 'pending' ? 'Pending' : p.status === 'suspended' ? 'Suspended' : 'Rejected'} /></td>

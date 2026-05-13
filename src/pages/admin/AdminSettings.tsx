@@ -13,7 +13,7 @@ import { getCurrentPosition } from '@/lib/helpers';
 import { Slider } from '@/components/ui/slider';
 
 export default function AdminSettings() {
-  const { settings, refresh } = useCompanySettings();
+  const { settings, loading: settingsLoading, refresh } = useCompanySettings();
   const [form, setForm] = useState<any>(null);
   const [saving, setSaving] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
@@ -21,7 +21,15 @@ export default function AdminSettings() {
 
   useEffect(() => { if (settings) setForm({ ...settings }); }, [settings]);
 
-  if (!form) return <DashboardLayout><div className="flex items-center justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div></DashboardLayout>;
+  if (settingsLoading) return <DashboardLayout><div className="flex items-center justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div></DashboardLayout>;
+  if (!form) return (
+    <DashboardLayout>
+      <div className="flex flex-col items-center justify-center py-20 text-center space-y-3">
+        <h2 className="text-xl font-heading font-bold">No Company Settings</h2>
+        <p className="text-muted-foreground max-w-md">You are logged in as a Super Admin without a specific company association. Navigate to a company's admin panel to configure its settings.</p>
+      </div>
+    </DashboardLayout>
+  );
 
   function update<K extends keyof typeof form>(key: K, val: any) {
     setForm({ ...form, [key]: val });

@@ -110,11 +110,15 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
                     <div className="text-xs text-muted-foreground truncate font-normal">{user?.email}</div>
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => navigate(profilePath)}>
-                    {user?.role === 'admin' ? <Settings className="h-4 w-4 mr-2" /> : <UserIcon className="h-4 w-4 mr-2" />}
-                    {user?.role === 'admin' ? 'Settings' : 'Profile'}
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
+                  {user?.role !== 'super_admin' && (
+                    <>
+                      <DropdownMenuItem onClick={() => navigate(profilePath)}>
+                        {user?.role === 'admin' ? <Settings className="h-4 w-4 mr-2" /> : <UserIcon className="h-4 w-4 mr-2" />}
+                        {user?.role === 'admin' ? 'Settings' : 'Profile'}
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                    </>
+                  )}
                   <DropdownMenuItem onClick={handleLogout} className="text-destructive focus:text-destructive">
                     <LogOut className="h-4 w-4 mr-2" /> Logout
                   </DropdownMenuItem>

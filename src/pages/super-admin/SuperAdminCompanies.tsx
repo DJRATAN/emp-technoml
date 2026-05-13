@@ -7,8 +7,18 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, Plus, Building2, Users, Clock, Shield, UserCog, UserCheck, Lock, Globe } from 'lucide-react';
+import { Loader2, Plus, Building2, Users, Clock, Shield, UserCog, UserCheck, Lock, Globe, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface CompanyRow {
   id: string;
@@ -20,6 +30,11 @@ interface CompanyRow {
   created_at: string;
   employee_count?: number;
   owner_name?: string;
+  owner_email?: string;
+  logo_url?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  address?: string | null;
 }
 
 const ALL_FEATURES = [
@@ -56,11 +71,30 @@ export default function SuperAdminCompanies() {
   const [ownerEmail, setOwnerEmail] = useState('');
   const [ownerName, setOwnerName] = useState('');
   const [ownerPassword, setOwnerPassword] = useState('');
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+
+  const [companyEmail, setCompanyEmail] = useState('');
+  const [companyPhone, setCompanyPhone] = useState('');
+  const [companyAddress, setCompanyAddress] = useState('');
+  const [companyThemeColor, setCompanyThemeColor] = useState('#0ea5e9');
 
   const [editOpen, setEditOpen] = useState(false);
   const [editingCompany, setEditingCompany] = useState<CompanyRow | null>(null);
   const [editName, setEditName] = useState('');
   const [editSlug, setEditSlug] = useState('');
+  const [editLogoFile, setEditLogoFile] = useState<File | null>(null);
+  const [editLogoPreview, setEditLogoPreview] = useState<string | null>(null);
+  const [editThemeColor, setEditThemeColor] = useState('#0ea5e9');
+  const [editEmail, setEditEmail] = useState('');
+  const [editPhone, setEditPhone] = useState('');
+  const [editAddress, setEditAddress] = useState('');
+  
+  const [editOwnerName, setEditOwnerName] = useState('');
+  const [editOwnerEmail, setEditOwnerEmail] = useState('');
+  const [editOwnerPassword, setEditOwnerPassword] = useState('');
+
   const [usersOpen, setUsersOpen] = useState(false);
   const [managingCompany, setManagingCompany] = useState<CompanyRow | null>(null);
   const [companyUsers, setCompanyUsers] = useState<any[]>([]);
@@ -77,6 +111,10 @@ export default function SuperAdminCompanies() {
   const [currentFeatures, setCurrentFeatures] = useState<any>({});
   const [featuresLoading, setFeaturesLoading] = useState(false);
   const [savingFeatures, setSavingFeatures] = useState(false);
+
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deletingCompany, setDeletingCompany] = useState<CompanyRow | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const loadCompanyUsers = async (company: CompanyRow) => {
     setManagingCompany(company);
@@ -174,21 +212,26 @@ export default function SuperAdminCompanies() {
           .select('*', { count: 'exact', head: true })
           .eq('company_id', c.id);
         
-        // Also get owner name
+        // Also get owner name and email
         let ownerName = 'Not Set';
+        let ownerEmail = '';
         if (c.owner_id) {
           const { data: owner } = await supabase
             .from('profiles')
-            .select('full_name')
+            .select('full_name, email')
             .eq('id', c.owner_id)
             .maybeSingle();
-          if (owner) ownerName = owner.full_name;
+          if (owner) {
+             ownerName = owner.full_name;
+             ownerEmail = owner.email;
+          }
         }
 
         return { 
           ...c, 
           employee_count: count ?? 0,
-          owner_name: ownerName
+          owner_name: ownerName,
+          owner_email: ownerEmail
         };
       }));
       
@@ -256,23 +299,129 @@ export default function SuperAdminCompanies() {
 
   async function createCompany(e: React.FormEvent) {
     e.preventDefault();
-    if (!name.trim() || !slug.trim() || !ownerEmail.trim() || !ownerName.trim() || ownerPassword.length < 6) {
-      toast.error('Fill all fields (password ≥ 6 chars)'); return;
+    if (!name.trim() || !slug.trim()) {
+      toast.error('Fill company name and slug'); return;
     }
     setSubmitting(true);
     try {
-      const { data, error } = await supabase.functions.invoke('provision-company', {
-        body: {
-          company: { name: name.trim(), slug: slug.trim().toLowerCase() },
-          owner: { email: ownerEmail.trim(), full_name: ownerName.trim(), password: ownerPassword },
-        },
-      });
-      if (error || !data?.success) {
-        throw new Error(data?.error ?? error?.message ?? 'Failed to create company');
+      // 1. Upload logo if provided
+      let uploadedLogoUrl = null;
+      if (logoFile) {
+        setUploadingLogo(true);
+        const ext = logoFile.name.split('.').pop();
+        const path = `logos/${slug}_${Date.now()}.${ext}`;
+        const { error: upErr } = await supabase.storage.from('company-assets').upload(path, logoFile, {
+          upsert: true,
+          contentType: logoFile.type,
+        });
+        if (upErr) throw upErr;
+        uploadedLogoUrl = path;
       }
-      toast.success(`Company "${name}" created with admin ${ownerEmail}`);
+
+      // 2. Create company record directly
+      const { data: company, error: cErr } = await supabase.from('companies').insert({
+        name: name.trim(),
+        slug: slug.trim().toLowerCase(),
+        status: 'active',
+        logo_url: uploadedLogoUrl,
+        email: companyEmail.trim() || null,
+        phone: companyPhone.trim() || null,
+        address: companyAddress.trim() || null,
+        theme_color: companyThemeColor,
+      } as any).select().single();
+      if (cErr) throw new Error(cErr.message);
+
+      // 3. Create company settings
+      await supabase.from('company_settings').insert({
+        company_id: company.id,
+        company_name: name.trim(),
+      } as any);
+
+      // 4. If admin details are provided, create via RPC
+      if (ownerEmail.trim() && ownerName.trim() && ownerPassword.length >= 6) {
+        try {
+          const { data: fnData, error: fnErr } = await supabase.rpc('create_company_admin', {
+            p_company_id: company.id,
+            p_email: ownerEmail.trim(),
+            p_full_name: ownerName.trim(),
+            p_password: ownerPassword
+          });
+          if (fnErr || !fnData?.success) {
+            toast.error(`Admin creation failed: ${fnErr?.message || fnData?.error || 'Unknown error'}`);
+          }
+        } catch (e: any) {
+          toast.error(`Error: ${e.message}`);
+        }
+      }
+
+      toast.success(`Company "${name}" created successfully!`);
       setName(''); setSlug(''); setOwnerEmail(''); setOwnerName(''); setOwnerPassword('');
+      setLogoFile(null); setLogoPreview(null);
+      setCompanyEmail(''); setCompanyPhone(''); setCompanyAddress(''); setCompanyThemeColor('#0ea5e9');
       setOpen(false);
+      load();
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setSubmitting(false);
+      setUploadingLogo(false);
+    }
+  }
+
+  async function updateCompany(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editingCompany || !editName.trim() || !editSlug.trim()) return;
+    setSubmitting(true);
+    try {
+      let logoUrl = editingCompany.logo_url;
+      // Upload new logo if selected
+      if (editLogoFile) {
+        const ext = editLogoFile.name.split('.').pop();
+        const path = `logos/${editSlug}_${Date.now()}.${ext}`;
+        const { error: upErr } = await supabase.storage.from('company-assets').upload(path, editLogoFile, {
+          upsert: true,
+          contentType: editLogoFile.type,
+        });
+        if (upErr) throw upErr;
+        logoUrl = path;
+      }
+      const { error } = await supabase.from('companies').update({
+        name: editName.trim(),
+        slug: editSlug.trim().toLowerCase(),
+        logo_url: logoUrl,
+        theme_color: editThemeColor,
+        email: editEmail.trim() || null,
+        phone: editPhone.trim() || null,
+        address: editAddress.trim() || null,
+      } as any).eq('id', editingCompany.id);
+      if (error) throw error;
+      
+      // Handle Owner Info
+      if (editOwnerName.trim() && editOwnerEmail.trim() && editOwnerPassword.length >= 6 && !editingCompany.owner_id) {
+        // Create new owner
+        const { data: fnData, error: fnErr } = await supabase.rpc('create_company_admin', {
+          p_company_id: editingCompany.id,
+          p_email: editOwnerEmail.trim(),
+          p_full_name: editOwnerName.trim(),
+          p_password: editOwnerPassword
+        });
+        if (fnErr || !fnData?.success) {
+          toast.error(`Failed to create owner: ${fnErr?.message || fnData?.error || 'Unknown error'}`);
+        }
+      } else if (editingCompany.owner_id && (editOwnerName || editOwnerEmail || editOwnerPassword)) {
+        // Update existing owner
+        await supabase.rpc('update_company_admin', {
+          p_user_id: editingCompany.owner_id,
+          p_email: editOwnerEmail.trim() || null,
+          p_full_name: editOwnerName.trim() || null,
+          p_password: editOwnerPassword || null
+        });
+      }
+
+      toast.success('Company updated');
+      setEditOpen(false);
+      setEditLogoFile(null);
+      setEditLogoPreview(null);
       load();
     } catch (err: any) {
       toast.error(err.message);
@@ -281,27 +430,34 @@ export default function SuperAdminCompanies() {
     }
   }
 
-  async function updateCompany(e: React.FormEvent) {
-    e.preventDefault();
-    if (!editingCompany || !editName.trim() || !editSlug.trim()) return;
-    setSubmitting(true);
-    const { error } = await supabase.from('companies').update({
-      name: editName.trim(),
-      slug: editSlug.trim().toLowerCase(),
-    }).eq('id', editingCompany.id);
-    setSubmitting(false);
-    if (error) return toast.error(error.message);
-    toast.success('Company updated');
-    setEditOpen(false);
-    load();
-  }
-
   async function toggleStatus(c: CompanyRow) {
     const next = c.status === 'active' ? 'suspended' : 'active';
     const { error } = await supabase.from('companies').update({ status: next }).eq('id', c.id);
     if (error) return toast.error(error.message);
     toast.success(`Company ${next}`);
     load();
+  }
+
+  function deleteCompany(c: CompanyRow) {
+    setDeletingCompany(c);
+    setDeleteOpen(true);
+  }
+
+  async function confirmDelete() {
+    if (!deletingCompany) return;
+    setIsDeleting(true);
+    try {
+      const { error } = await supabase.from('companies').delete().eq('id', deletingCompany.id);
+      if (error) throw error;
+      toast.success(`Company ${deletingCompany.name} deleted successfully.`);
+      setDeleteOpen(false);
+      load();
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to delete company');
+    } finally {
+      setIsDeleting(false);
+      setDeletingCompany(null);
+    }
   }
 
   return (
@@ -320,7 +476,7 @@ export default function SuperAdminCompanies() {
               <DialogTrigger asChild>
                 <Button className="shadow-lg shadow-primary/20"><Plus className="h-4 w-4 mr-2" />New Organization</Button>
               </DialogTrigger>
-              <DialogContent className="sm:max-w-md">
+              <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                   <DialogTitle className="flex items-center gap-2">
                     <Building2 className="h-5 w-5 text-primary" />
@@ -345,6 +501,71 @@ export default function SuperAdminCompanies() {
                       </div>
                       <p className="text-[10px] text-muted-foreground">This unique code is used by employees to sign in.</p>
                     </div>
+
+                    <div className="space-y-3 pt-2 border-t">
+                      <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Company Logo</Label>
+                      <div className="flex items-center gap-4">
+                        <div className="h-16 w-16 rounded-xl border bg-muted flex items-center justify-center overflow-hidden">
+                          {logoPreview ? (
+                            <img src={logoPreview} alt="Logo" className="object-contain h-full w-full" />
+                          ) : (
+                            <Building2 className="h-6 w-6 text-muted-foreground/40" />
+                          )}
+                        </div>
+                        <div className="space-y-2">
+                          <input 
+                            type="file" 
+                            id="logo-upload" 
+                            className="hidden" 
+                            accept="image/*" 
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                if (file.size > 2 * 1024 * 1024) return toast.error('Max logo size is 2MB');
+                                setLogoFile(file);
+                                setLogoPreview(URL.createObjectURL(file));
+                              }
+                            }} 
+                          />
+                          <Button 
+                            type="button" 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={() => document.getElementById('logo-upload')?.click()}
+                          >
+                            <Building2 className="h-3 w-3 mr-2" />
+                            {logoPreview ? 'Change Logo' : 'Select Logo'}
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Contact Info */}
+                    <div className="space-y-3 pt-2 border-t">
+                      <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Contact Information</Label>
+                      <div className="space-y-1.5">
+                        <Label className="text-xs">Email</Label>
+                        <Input type="email" placeholder="contact@company.com" value={companyEmail} onChange={(e) => setCompanyEmail(e.target.value)} />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-xs">Phone</Label>
+                        <Input type="tel" placeholder="+91 98765 43210" value={companyPhone} onChange={(e) => setCompanyPhone(e.target.value)} />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-xs">Address</Label>
+                        <Input placeholder="123 Business Park, City" value={companyAddress} onChange={(e) => setCompanyAddress(e.target.value)} />
+                      </div>
+                    </div>
+
+                    {/* Theme Color */}
+                    <div className="space-y-2 pt-2 border-t">
+                      <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground block">Theme Color</Label>
+                      <div className="flex gap-2">
+                        <Input type="color" className="h-9 w-12 p-0 border-none bg-transparent" value={companyThemeColor} onChange={(e) => setCompanyThemeColor(e.target.value)} />
+                        <Input value={companyThemeColor} onChange={(e) => setCompanyThemeColor(e.target.value)} className="font-mono" />
+                      </div>
+                    </div>
+
                     <div className="border-t pt-4 space-y-3">
                       <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Primary Administrator</Label>
                       <div className="space-y-2">
@@ -424,9 +645,9 @@ export default function SuperAdminCompanies() {
 
         {/* Edit Dialog */}
         <Dialog open={editOpen} onOpenChange={setEditOpen}>
-          <DialogContent>
-            <DialogHeader><DialogTitle>Edit Company</DialogTitle></DialogHeader>
-            <form onSubmit={updateCompany} className="space-y-4">
+          <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
+            <DialogHeader><DialogTitle className="flex items-center gap-2"><Building2 className="h-5 w-5 text-primary" /> Edit Company</DialogTitle></DialogHeader>
+            <form onSubmit={updateCompany} className="space-y-4 pt-2">
               <div className="space-y-1.5">
                 <Label>Company name</Label>
                 <Input required value={editName} onChange={(e) => setEditName(e.target.value)} />
@@ -435,6 +656,82 @@ export default function SuperAdminCompanies() {
                 <Label>Company code (slug)</Label>
                 <Input required value={editSlug} onChange={(e) => setEditSlug(e.target.value.toLowerCase().replace(/\s+/g, '-'))} className="font-mono" />
               </div>
+              
+              {/* Logo Upload */}
+              <div className="space-y-2 pt-2 border-t">
+                <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Company Logo</Label>
+                <div className="flex items-center gap-4">
+                  <div className="h-16 w-16 rounded-xl border bg-muted flex items-center justify-center overflow-hidden">
+                    {editLogoPreview ? (
+                      <img src={editLogoPreview} alt="Logo" className="object-contain h-full w-full" />
+                    ) : editingCompany?.logo_url ? (
+                      <img src={supabase.storage.from('company-assets').getPublicUrl(editingCompany.logo_url).data.publicUrl} alt="Logo" className="object-contain h-full w-full" />
+                    ) : (
+                      <Building2 className="h-6 w-6 text-muted-foreground/40" />
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <input type="file" id="edit-logo-upload" className="hidden" accept="image/*" onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        if (file.size > 2 * 1024 * 1024) return toast.error('Max logo size is 2MB');
+                        setEditLogoFile(file);
+                        setEditLogoPreview(URL.createObjectURL(file));
+                      }
+                    }} />
+                    <Button type="button" variant="outline" size="sm" onClick={() => document.getElementById('edit-logo-upload')?.click()}>
+                      <Building2 className="h-3 w-3 mr-2" />
+                      {editLogoPreview || editingCompany?.logo_url ? 'Change Logo' : 'Upload Logo'}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Contact Info */}
+              <div className="space-y-3 pt-2 border-t">
+                <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Contact Information</Label>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Email</Label>
+                  <Input type="email" placeholder="contact@company.com" value={editEmail} onChange={(e) => setEditEmail(e.target.value)} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Phone</Label>
+                  <Input type="tel" placeholder="+91 98765 43210" value={editPhone} onChange={(e) => setEditPhone(e.target.value)} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Address</Label>
+                  <Input placeholder="123 Business Park, City" value={editAddress} onChange={(e) => setEditAddress(e.target.value)} />
+                </div>
+              </div>
+
+              {/* Primary Administrator (Owner) Info */}
+              <div className="space-y-3 pt-2 border-t">
+                <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Primary Administrator</Label>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Full Name</Label>
+                  <Input placeholder="John Doe" value={editOwnerName} onChange={(e) => setEditOwnerName(e.target.value)} required={!editingCompany?.owner_id && editOwnerEmail.length > 0} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Login Email</Label>
+                  <Input type="email" placeholder="admin@company.com" value={editOwnerEmail} onChange={(e) => setEditOwnerEmail(e.target.value)} required={!editingCompany?.owner_id && editOwnerName.length > 0} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">
+                    {editingCompany?.owner_id ? "New Password (leave blank to keep current)" : "Initial Password"}
+                  </Label>
+                  <Input type="password" minLength={6} value={editOwnerPassword} onChange={(e) => setEditOwnerPassword(e.target.value)} required={!editingCompany?.owner_id && editOwnerName.length > 0} />
+                </div>
+              </div>
+
+              {/* Theme Color */}
+              <div className="space-y-2">
+                <Label>Theme Color</Label>
+                <div className="flex gap-2">
+                  <Input type="color" className="h-9 w-12 p-0 border-none bg-transparent" value={editThemeColor} onChange={(e) => setEditThemeColor(e.target.value)} />
+                  <Input value={editThemeColor} onChange={(e) => setEditThemeColor(e.target.value)} className="font-mono" />
+                </div>
+              </div>
+
               <Button type="submit" className="w-full" disabled={submitting}>
                 {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Save Changes'}
               </Button>
@@ -592,8 +889,12 @@ export default function SuperAdminCompanies() {
               {companies.map((c) => (
                 <div key={c.id} className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-5 rounded-2xl border bg-card/50 hover:border-primary/20 transition-colors shadow-sm">
                   <div className="flex items-center gap-4 min-w-0">
-                    <div className="h-12 w-12 rounded-2xl bg-primary/10 flex items-center justify-center flex-shrink-0">
-                      <Building2 className="h-6 w-6 text-primary" />
+                    <div className="h-12 w-12 rounded-2xl bg-primary/10 flex items-center justify-center flex-shrink-0 overflow-hidden">
+                      {c.logo_url ? (
+                        <img src={supabase.storage.from('company-assets').getPublicUrl(c.logo_url).data.publicUrl} alt="" className="object-contain h-full w-full" />
+                      ) : (
+                        <Building2 className="h-6 w-6 text-primary" />
+                      )}
                     </div>
                     <div className="min-w-0">
                       <h4 className="font-heading font-bold text-lg truncate leading-tight flex items-center gap-2">
@@ -633,11 +934,24 @@ export default function SuperAdminCompanies() {
                       setEditingCompany(c);
                       setEditName(c.name);
                       setEditSlug(c.slug);
+                      setEditLogoFile(null);
+                      setEditLogoPreview(null);
+                      setEditThemeColor((c as any).theme_color || '#0ea5e9');
+                      setEditEmail((c as any).email || '');
+                      setEditPhone((c as any).phone || '');
+                      setEditAddress((c as any).address || '');
+                      setEditOwnerName(c.owner_name !== 'Not Set' ? (c.owner_name || '') : '');
+                      setEditOwnerEmail((c as any).owner_email || '');
+                      setEditOwnerPassword('');
                       setEditOpen(true);
                     }}>Edit</Button>
                     
                     <Button size="sm" variant="outline" onClick={() => toggleStatus(c)}>
                       {c.status === 'active' ? 'Suspend' : 'Activate'}
+                    </Button>
+
+                    <Button size="sm" variant="outline" className="text-destructive hover:bg-destructive/10 hover:text-destructive border-destructive/20" onClick={() => deleteCompany(c)}>
+                      <Trash2 className="h-4 w-4 mr-1.5" /> Delete
                     </Button>
                   </div>
                 </div>
@@ -645,6 +959,33 @@ export default function SuperAdminCompanies() {
             </div>
           )}
         </Card>
+
+        <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This action cannot be undone. This will permanently delete the 
+                company <strong className="text-foreground">{deletingCompany?.name}</strong> and remove all 
+                associated data including users, tasks, and settings.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+              <AlertDialogAction 
+                onClick={(e) => {
+                  e.preventDefault();
+                  confirmDelete();
+                }}
+                disabled={isDeleting}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                {isDeleting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Trash2 className="h-4 w-4 mr-2" />}
+                Delete Company
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
       </div>
     </DashboardLayout>

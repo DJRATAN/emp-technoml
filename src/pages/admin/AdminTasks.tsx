@@ -1,312 +1,814 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
-import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
-import { StatusBadge } from '@/components/ui/status-badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { Plus, Loader2, Trash2, Target, Mic, MicOff, GitMerge } from 'lucide-react';
+import {
+  Plus, Loader2, Trash2, Download, Upload, Search, Filter,
+  ChevronDown, Check, X, Calendar, ArrowUpDown, FileSpreadsheet, AlertCircle, UserCheck,
+} from 'lucide-react';
 import { toast } from 'sonner';
+import * as XLSX from 'xlsx';
 
+/* ── types ─────────────────────────────────────────────────────────── */
 type Priority = 'low' | 'medium' | 'high';
 type TaskStatus = 'pending' | 'in_progress' | 'completed';
 
-type Task = {
+interface Task {
   id: string; title: string; description: string | null; priority: Priority;
   status: TaskStatus; due_date: string | null; assigned_to: string | null;
-  is_target: boolean; target_month: string | null; target_count: number | null; progress_count: number;
-  profiles?: { full_name: string };
-};
-type Emp = { id: string; full_name: string };
+  is_target: boolean; target_month: string | null; target_count: number | null;
+  progress_count: number; profiles?: { full_name: string };
+}
+interface Emp { id: string; full_name: string }
 
-const priorityVariant: Record<string, 'destructive' | 'default' | 'secondary'> = {
-  high: 'destructive', medium: 'default', low: 'secondary',
+/* ── helpers ───────────────────────────────────────────────────────── */
+const PRIORITY_COLORS: Record<Priority, string> = {
+  high: '#ef4444', medium: '#f59e0b', low: '#22c55e',
+};
+const STATUS_LABELS: Record<TaskStatus, string> = {
+  pending: 'To Do', in_progress: 'In Progress', completed: 'Done',
+};
+const STATUS_COLORS: Record<TaskStatus, string> = {
+  pending: '#94a3b8', in_progress: '#3b82f6', completed: '#22c55e',
 };
 
-function monthInputValue(d: Date) {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+/* ── inline dropdown ──────────────────────────────────────────────── */
+function CellDropdown<T extends string>({
+  value, options, colorMap, labelMap, onChange,
+}: {
+  value: T; options: T[];
+  colorMap?: Record<string, string>; labelMap?: Record<string, string>;
+  onChange: (v: T) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
+  const color = colorMap?.[value] ?? '#64748b';
+  const label = labelMap?.[value] ?? value;
+
+  return (
+    <div ref={ref} className="relative" style={{ minWidth: 90 }}>
+      <button
+        onClick={() => setOpen(!open)}
+        className="flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium transition-all hover:opacity-80"
+        style={{ background: color + '18', color, border: `1px solid ${color}30` }}
+      >
+        <span className="w-1.5 h-1.5 rounded-full" style={{ background: color }} />
+        {label}
+        <ChevronDown className="w-3 h-3 ml-0.5 opacity-60" />
+      </button>
+      {open && (
+        <div className="absolute z-50 top-full left-0 mt-1 bg-popover border border-border rounded-lg shadow-xl py-1 min-w-[130px] animate-in fade-in-0 zoom-in-95 duration-150">
+          {options.map(opt => {
+            const c = colorMap?.[opt] ?? '#64748b';
+            const l = labelMap?.[opt] ?? opt;
+            return (
+              <button key={opt} onClick={() => { onChange(opt); setOpen(false); }}
+                className="flex items-center gap-2 w-full px-3 py-1.5 text-xs hover:bg-accent transition-colors"
+              >
+                <span className="w-2 h-2 rounded-full" style={{ background: c }} />
+                <span style={{ color: c }} className="font-medium">{l}</span>
+                {opt === value && <Check className="w-3 h-3 ml-auto text-primary" />}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
 }
 
-export default function AdminTasks() {
-  const { user } = useAuth();
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [employees, setEmployees] = useState<Emp[]>([]);
-  const [loading, setLoading] = useState(true);
+/* ── editable text cell ───────────────────────────────────────────── */
+function EditableCell({
+  value, onChange, placeholder, type = 'text', className = '',
+}: {
+  value: string; onChange: (v: string) => void; placeholder?: string;
+  type?: 'text' | 'date'; className?: string;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value);
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  // task dialog
-  const [taskOpen, setTaskOpen] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [busyId, setBusyId] = useState<string | null>(null);
-  const [title, setTitle] = useState(''); const [desc, setDesc] = useState('');
-  const [priority, setPriority] = useState<Priority>('medium');
-  const [dueDate, setDueDate] = useState(''); const [assignee, setAssignee] = useState<string>('');
-  const [parentTaskId, setParentTaskId] = useState<string>('');
-  const [isRecording, setIsRecording] = useState(false);
+  useEffect(() => { setDraft(value); }, [value]);
+  useEffect(() => { if (editing) inputRef.current?.focus(); }, [editing]);
 
-  // target dialog
-  const [tgtOpen, setTgtOpen] = useState(false);
-  const [tgtTitle, setTgtTitle] = useState('');
-  const [tgtMonth, setTgtMonth] = useState(monthInputValue(new Date()));
-  const [tgtCount, setTgtCount] = useState('');
-  const [tgtAssignee, setTgtAssignee] = useState('');
+  const commit = () => {
+    setEditing(false);
+    if (draft.trim() !== value) onChange(draft.trim());
+  };
 
-  const load = useCallback(async () => {
-    const [t, p] = await Promise.all([
-      supabase.from('tasks').select('*').order('created_at', { ascending: false }),
-      supabase.from('profiles').select('id, full_name').eq('status', 'approved').order('full_name'),
-    ]);
-    const profMap = new Map((p.data ?? []).map((e: any) => [e.id, e]));
-    const tasksWithNames = ((t.data ?? []) as any[]).map((task) => ({
-      ...task,
-      profiles: task.assigned_to ? profMap.get(task.assigned_to) : undefined,
-    }));
-    setTasks(tasksWithNames as Task[]);
-    setEmployees((p.data as Emp[]) ?? []);
-    setLoading(false);
-  }, []);
-
-  useEffect(() => { load(); }, [load]);
-
-  const regular = useMemo(() => tasks.filter((t) => !t.is_target), [tasks]);
-  const targets = useMemo(() => tasks.filter((t) => t.is_target), [tasks]);
-
-  async function createTask(e: React.FormEvent) {
-    e.preventDefault();
-    if (!user || !user.companyId || !title.trim() || !assignee) return;
-    setSubmitting(true);
-    const { error } = await supabase.from('tasks').insert({
-      title: title.trim(), description: desc.trim() || null, priority, status: 'pending',
-      due_date: dueDate || null, assigned_to: assignee, assigned_by: user.id,
-      company_id: user.companyId, is_target: false,
-      parent_task_id: parentTaskId || null,
-    } as any);
-    setSubmitting(false);
-    if (error) return toast.error(error.message);
-    toast.success('Task created');
-    setTitle(''); setDesc(''); setPriority('medium'); setDueDate(''); setAssignee(''); setParentTaskId('');
-    setTaskOpen(false); load();
-  }
-
-  async function createTarget(e: React.FormEvent) {
-    e.preventDefault();
-    if (!user?.companyId || !tgtTitle.trim() || !tgtAssignee) return;
-    const count = Number(tgtCount);
-    if (!count || count < 1) return toast.error('Enter a valid target count');
-    setSubmitting(true);
-    const { error } = await supabase.from('tasks').insert({
-      title: tgtTitle.trim(),
-      description: null,
-      priority: 'medium',
-      status: 'pending',
-      due_date: null,
-      assigned_to: tgtAssignee,
-      assigned_by: user.id,
-      company_id: user.companyId,
-      is_target: true,
-      target_month: `${tgtMonth}-01`,
-      target_count: count,
-      progress_count: 0,
-    });
-    setSubmitting(false);
-    if (error) return toast.error(error.message);
-    toast.success('Target task created');
-    setTgtTitle(''); setTgtCount(''); setTgtAssignee('');
-    setTgtOpen(false); load();
-  }
-
-  async function remove(id: string) {
-    setBusyId(id);
-    const { error } = await supabase.from('tasks').delete().eq('id', id);
-    setBusyId(null);
-    if (error) return toast.error(error.message);
-    toast.success('Deleted'); load();
-  }
-
-  function TaskRow({ t }: { t: Task }) {
+  if (!editing) {
     return (
-      <div className="flex items-start justify-between gap-4 p-4 rounded-xl bg-muted/30">
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2 mb-1 flex-wrap">
-            <h4 className="font-semibold">{t.title}</h4>
-            <Badge variant={priorityVariant[t.priority]}>{t.priority}</Badge>
-            <StatusBadge status={t.status === 'in_progress' ? 'In Progress' : t.status === 'completed' ? 'Completed' : 'Pending'} />
-          </div>
-          {t.description && <p className="text-sm text-muted-foreground mb-1">{t.description}</p>}
-          <p className="text-xs text-muted-foreground">
-            Assigned to <span className="font-medium text-foreground">{t.profiles?.full_name ?? 'Unassigned'}</span> · Due {t.due_date ?? '—'}
-          </p>
-        </div>
-        <Button size="sm" variant="ghost" disabled={busyId === t.id} onClick={() => remove(t.id)} className="text-destructive hover:text-destructive">
-          {busyId === t.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-        </Button>
-      </div>
-    );
-  }
-
-  function TargetRow({ t }: { t: Task }) {
-    const total = t.target_count ?? 0;
-    const done = t.progress_count ?? 0;
-    const pct = total ? Math.min(100, Math.round((done / total) * 100)) : 0;
-    const monthLabel = t.target_month
-      ? new Date(t.target_month).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
-      : '—';
-    return (
-      <div className="p-4 rounded-xl bg-muted/30 space-y-2">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2 flex-wrap">
-              <Target className="h-4 w-4 text-primary" />
-              <h4 className="font-semibold">{t.title}</h4>
-              <Badge variant="secondary">{monthLabel}</Badge>
-              <StatusBadge status={t.status === 'in_progress' ? 'In Progress' : t.status === 'completed' ? 'Completed' : 'Pending'} />
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              {t.profiles?.full_name ?? 'Unassigned'} · <strong className="text-foreground">{done}/{total}</strong>
-            </p>
-          </div>
-          <Button size="sm" variant="ghost" disabled={busyId === t.id} onClick={() => remove(t.id)} className="text-destructive hover:text-destructive">
-            {busyId === t.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-          </Button>
-        </div>
-        <Progress value={pct} className="h-2" />
+      <div onClick={() => setEditing(true)}
+        className={`cursor-text px-2 py-1 rounded min-h-[28px] flex items-center hover:bg-accent/50 transition-colors text-sm ${!value ? 'text-muted-foreground italic' : ''} ${className}`}
+      >
+        {value || placeholder || '—'}
       </div>
     );
   }
 
   return (
+    <input ref={inputRef} type={type} value={draft}
+      onChange={e => setDraft(e.target.value)}
+      onBlur={commit} onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') { setDraft(value); setEditing(false); } }}
+      className={`w-full px-2 py-1 text-sm bg-background border-2 border-primary/40 rounded outline-none focus:border-primary transition-colors ${className}`}
+      placeholder={placeholder}
+    />
+  );
+}
+
+/* ── assignee cell ────────────────────────────────────────────────── */
+function AssigneeCell({ value, employees, onChange }: {
+  value: string | null; employees: Emp[]; onChange: (id: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const ref = useRef<HTMLDivElement>(null);
+  const current = employees.find(e => e.id === value);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
+  const filtered = employees.filter(e =>
+    e.full_name.toLowerCase().includes(search.toLowerCase())
+  );
+
+  return (
+    <div ref={ref} className="relative">
+      <button onClick={() => { setOpen(!open); setSearch(''); }}
+        className="flex items-center gap-2 px-2 py-1 rounded hover:bg-accent/50 transition-colors text-sm min-h-[28px] w-full text-left"
+      >
+        {current ? (
+          <>
+            <span className="w-5 h-5 rounded-full bg-primary/10 text-primary text-[10px] font-bold flex items-center justify-center shrink-0">
+              {current.full_name.charAt(0).toUpperCase()}
+            </span>
+            <span className="truncate">{current.full_name}</span>
+          </>
+        ) : (
+          <span className="text-muted-foreground italic">Unassigned</span>
+        )}
+      </button>
+      {open && (
+        <div className="absolute z-50 top-full left-0 mt-1 bg-popover border border-border rounded-lg shadow-xl py-1 min-w-[200px] max-h-[220px] animate-in fade-in-0 zoom-in-95 duration-150">
+          <div className="px-2 pb-1">
+            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search..."
+              className="w-full text-xs px-2 py-1.5 bg-muted rounded border-0 outline-none"
+              autoFocus
+            />
+          </div>
+          <div className="overflow-y-auto max-h-[160px]">
+            {filtered.map(e => (
+              <button key={e.id} onClick={() => { onChange(e.id); setOpen(false); }}
+                className="flex items-center gap-2 w-full px-3 py-1.5 text-xs hover:bg-accent transition-colors"
+              >
+                <span className="w-5 h-5 rounded-full bg-primary/10 text-primary text-[10px] font-bold flex items-center justify-center">
+                  {e.full_name.charAt(0).toUpperCase()}
+                </span>
+                {e.full_name}
+                {e.id === value && <Check className="w-3 h-3 ml-auto text-primary" />}
+              </button>
+            ))}
+            {filtered.length === 0 && <p className="text-xs text-muted-foreground px-3 py-2">No results</p>}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── main component ───────────────────────────────────────────────── */
+export default function AdminTasks() {
+  const { user } = useAuth();
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [employees, setEmployees] = useState<Emp[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterStatus, setFilterStatus] = useState<TaskStatus | 'all'>('all');
+  const [sortCol, setSortCol] = useState<string>('created');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+  const [adding, setAdding] = useState(false);
+  const [newTitle, setNewTitle] = useState('');
+  const newInputRef = useRef<HTMLInputElement>(null);
+
+  // Upload state
+  const [csvOpen, setCsvOpen] = useState(false);
+  const [csvData, setCsvData] = useState<Record<string, string>[]>([]);
+  const [csvHeaders, setCsvHeaders] = useState<string[]>([]);
+  const [csvUploading, setCsvUploading] = useState(false);
+  const [csvDragOver, setCsvDragOver] = useState(false);
+  const [csvAssignee, setCsvAssignee] = useState<string>('');
+  const [csvFileName, setCsvFileName] = useState('');
+  const csvInputRef = useRef<HTMLInputElement>(null);
+  const [busyIds, setBusyIds] = useState<Set<string>>(new Set());
+
+  /* ── data loading ─────────────────────────────────────────────── */
+  const load = useCallback(async () => {
+    const profilesQuery = supabase.from('profiles').select('id, full_name').eq('status', 'approved').order('full_name');
+    // Filter employees by the admin's company so other tenants are never shown
+    if (user?.companyId) profilesQuery.eq('company_id', user.companyId);
+
+    const [t, p] = await Promise.all([
+      supabase.from('tasks').select('*').order('created_at', { ascending: false }),
+      profilesQuery,
+    ]);
+    const profMap = new Map((p.data ?? []).map((e: any) => [e.id, e]));
+    // Filter out any tasks with null id to prevent update-all bugs
+    const validTasks = ((t.data ?? []) as any[]).filter(task => {
+      if (!task.id) { console.warn('Task missing id:', task); return false; }
+      return true;
+    });
+    const tasksData = validTasks.map(task => ({
+      ...task,
+      profiles: task.assigned_to ? profMap.get(task.assigned_to) : undefined,
+    }));
+    setTasks(tasksData as Task[]);
+    setEmployees((p.data as Emp[]) ?? []);
+    setLoading(false);
+  }, [user?.companyId]);
+
+  useEffect(() => { load(); }, [load]);
+
+  /* ── filtering & sorting ──────────────────────────────────────── */
+  const filtered = useMemo(() => {
+    let result = tasks.filter(t => !t.is_target);
+    if (filterStatus !== 'all') result = result.filter(t => t.status === filterStatus);
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter(t =>
+        t.title.toLowerCase().includes(q) ||
+        (t.description ?? '').toLowerCase().includes(q) ||
+        (t.profiles?.full_name ?? '').toLowerCase().includes(q)
+      );
+    }
+    result.sort((a, b) => {
+      let cmp = 0;
+      if (sortCol === 'title') cmp = a.title.localeCompare(b.title);
+      else if (sortCol === 'priority') cmp = ['low', 'medium', 'high'].indexOf(a.priority) - ['low', 'medium', 'high'].indexOf(b.priority);
+      else if (sortCol === 'status') cmp = a.status.localeCompare(b.status);
+      else if (sortCol === 'due') cmp = (a.due_date ?? '').localeCompare(b.due_date ?? '');
+      else if (sortCol === 'assignee') cmp = (a.profiles?.full_name ?? '').localeCompare(b.profiles?.full_name ?? '');
+      return sortDir === 'asc' ? cmp : -cmp;
+    });
+    return result;
+  }, [tasks, filterStatus, searchQuery, sortCol, sortDir]);
+
+  const allSelected = filtered.length > 0 && filtered.every(t => selected.has(t.id));
+
+  /* ── CRUD ─────────────────────────────────────────────────────── */
+  async function updateField(id: string, field: string, value: any) {
+    // Optimistic local update so UI changes instantly
+    setTasks(prev => prev.map(t => t.id === id ? { ...t, [field]: value,
+      ...(field === 'assigned_to' ? { profiles: employees.find(e => e.id === value) } : {}),
+    } : t));
+
+    const { error, count } = await supabase
+      .from('tasks')
+      .update({ [field]: value } as any)
+      .eq('id', id);
+
+    if (error) {
+      toast.error(error.message);
+      load(); // revert
+      return;
+    }
+    toast.success('Updated');
+  }
+
+  async function addRow() {
+    if (!user?.companyId || !newTitle.trim()) return;
+    setAdding(true);
+    const { error } = await supabase.from('tasks').insert({
+      title: newTitle.trim(), description: null, priority: 'medium', status: 'pending',
+      due_date: null, assigned_to: null, assigned_by: user.id,
+      company_id: user.companyId, is_target: false,
+    } as any);
+    setAdding(false);
+    if (error) return toast.error(error.message);
+    toast.success('Task added');
+    setNewTitle('');
+    load();
+  }
+
+  async function bulkDelete() {
+    const ids = [...selected];
+    if (!ids.length) return;
+    const { error } = await supabase.from('tasks').delete().in('id', ids);
+    if (error) return toast.error(error.message);
+    toast.success(`Deleted ${ids.length} task(s)`);
+    setSelected(new Set());
+    load();
+  }
+
+  async function removeOne(id: string) {
+    setBusyIds(s => new Set(s).add(id));
+    const { error } = await supabase.from('tasks').delete().eq('id', id);
+    setBusyIds(s => { const n = new Set(s); n.delete(id); return n; });
+    if (error) return toast.error(error.message);
+    toast.success('Deleted');
+    load();
+  }
+
+  function exportCsv() {
+    const header = 'Title,Status,Priority,Assignee,Due Date,Description';
+    const rows = filtered.map(t =>
+      `"${t.title}","${STATUS_LABELS[t.status]}","${t.priority}","${t.profiles?.full_name ?? ''}","${t.due_date ?? ''}","${t.description ?? ''}"`
+    );
+    const blob = new Blob([header + '\n' + rows.join('\n')], { type: 'text/csv' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+    a.download = 'tasks.csv'; a.click();
+  }
+
+  /* ── File import (CSV + Excel) ────────────────────────────────── */
+  function handleFile(file: File) {
+    const ext = file.name.split('.').pop()?.toLowerCase();
+    setCsvFileName(file.name);
+    if (ext === 'csv') {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const text = e.target?.result as string;
+        const lines = text.split(/\r?\n/).filter(l => l.trim());
+        if (lines.length < 2) return toast.error('File must have a header row and at least one data row');
+        const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
+        const lowerHeaders = headers.map(h => h.toLowerCase());
+        const rows = lines.slice(1).map(line => {
+          const vals = line.match(/("[^"]*"|[^,]*)/g) ?? [];
+          const row: Record<string, string> = {};
+          lowerHeaders.forEach((h, i) => { row[h] = (vals[i] ?? '').trim().replace(/^"|"$/g, ''); });
+          return row;
+        });
+        setCsvHeaders(headers);
+        setCsvData(rows);
+      };
+      reader.readAsText(file);
+    } else if (ext === 'xlsx' || ext === 'xls') {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const data = new Uint8Array(e.target?.result as ArrayBuffer);
+        const wb = XLSX.read(data, { type: 'array' });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const json = XLSX.utils.sheet_to_json<Record<string, any>>(ws, { defval: '' });
+        if (!json.length) return toast.error('No data found in the Excel file');
+        const headers = Object.keys(json[0]);
+        const rows = json.map(r => {
+          const row: Record<string, string> = {};
+          headers.forEach(h => { row[h.toLowerCase()] = String(r[h] ?? ''); });
+          return row;
+        });
+        setCsvHeaders(headers);
+        setCsvData(rows);
+      };
+      reader.readAsArrayBuffer(file);
+    } else {
+      toast.error('Please upload a .csv, .xlsx, or .xls file');
+    }
+  }
+
+  function mapField(row: Record<string, string>, keys: string[]): string | null {
+    for (const k of keys) { if (row[k]?.trim()) return row[k].trim(); }
+    return null;
+  }
+
+  async function importFile() {
+    if (!user?.companyId || csvData.length === 0) return;
+    if (!csvAssignee) return toast.error('Please select an employee to assign tasks to');
+    setCsvUploading(true);
+    const inserts = csvData.map((row, idx) => {
+      const title = mapField(row, ['title', 'task', 'task name', 'name', 'task_name', 'team']) ?? `Row ${idx + 1}`;
+      const desc = mapField(row, ['description', 'desc', 'details', 'notes']);
+      const targetVal = mapField(row, ['target', 'target_count']);
+      const achieveVal = mapField(row, ['achieve target', 'achieve_target', 'achieved', 'progress', 'progress_count']);
+      const isTarget = !!targetVal && Number(targetVal) > 0;
+      // Build extra data string from all other columns
+      const knownKeys = new Set(['sr no', 'sno', 's.no', 'title', 'task', 'task name', 'name', 'task_name', 'team',
+        'description', 'desc', 'details', 'notes', 'target', 'target_count',
+        'achieve target', 'achieve_target', 'achieved', 'progress', 'progress_count',
+        'priority', 'prio', 'status', 'state', 'due_date', 'due date', 'due', 'deadline',
+        'assignee', 'assigned_to', 'assigned to', 'assign', 'employee', 'owner']);
+      const extras: Record<string, string> = {};
+      Object.entries(row).forEach(([k, v]) => {
+        if (!knownKeys.has(k) && v && v !== '0') extras[k] = v;
+      });
+      const extraStr = Object.keys(extras).length > 0 ? JSON.stringify(extras) : null;
+      const fullDesc = [desc, extraStr].filter(Boolean).join('\n');
+      return {
+        title,
+        description: fullDesc || null,
+        priority: 'medium' as Priority,
+        status: 'pending' as TaskStatus,
+        due_date: mapField(row, ['due_date', 'due date', 'due', 'deadline', 'date']) || null,
+        assigned_to: csvAssignee,
+        assigned_by: user.id,
+        company_id: user.companyId,
+        is_target: isTarget,
+        target_count: isTarget ? Number(targetVal) : null,
+        progress_count: achieveVal ? Number(achieveVal) : 0,
+      };
+    });
+    const { error } = await supabase.from('tasks').insert(inserts as any);
+    setCsvUploading(false);
+    if (error) return toast.error(error.message);
+    toast.success(`Imported ${inserts.length} task(s)`);
+    setCsvOpen(false); setCsvData([]); setCsvHeaders([]); setCsvAssignee(''); setCsvFileName('');
+    load();
+  }
+
+  function toggleSort(col: string) {
+    if (sortCol === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortCol(col); setSortDir('asc'); }
+  }
+
+  /* ── column definitions ───────────────────────────────────────── */
+  const columns = [
+    { key: 'title', label: 'Task Name', width: 'minmax(220px, 2fr)' },
+    { key: 'status', label: 'Status', width: '140px' },
+    { key: 'priority', label: 'Priority', width: '120px' },
+    { key: 'assignee', label: 'Assignee', width: 'minmax(160px, 1fr)' },
+    { key: 'due', label: 'Due Date', width: '140px' },
+    { key: 'actions', label: '', width: '50px' },
+  ];
+
+  const gridTemplate = `40px ${columns.map(c => c.width).join(' ')}`;
+
+  /* ── stats ────────────────────────────────────────────────────── */
+  const regularTasks = tasks.filter(t => !t.is_target);
+  const stats = {
+    total: regularTasks.length,
+    todo: regularTasks.filter(t => t.status === 'pending').length,
+    progress: regularTasks.filter(t => t.status === 'in_progress').length,
+    done: regularTasks.filter(t => t.status === 'completed').length,
+  };
+
+  /* ── render ───────────────────────────────────────────────────── */
+  return (
     <DashboardLayout>
-      <div className="space-y-6">
-        <div className="flex items-center justify-between gap-2 flex-wrap">
+      <div className="space-y-5">
+        {/* Header */}
+        <div className="flex items-center justify-between gap-4 flex-wrap">
           <div>
             <h1 className="text-2xl font-heading font-bold">Tasks</h1>
-            <p className="text-muted-foreground">Assign one-off tasks or monthly targets</p>
+            <p className="text-muted-foreground text-sm">Manage and assign tasks — spreadsheet style</p>
           </div>
           <div className="flex gap-2">
-            <Dialog open={tgtOpen} onOpenChange={setTgtOpen}>
-              <DialogTrigger asChild><Button variant="outline"><Target className="h-4 w-4 mr-2" />New Monthly Target</Button></DialogTrigger>
-              <DialogContent>
-                <DialogHeader><DialogTitle>Create Monthly Target Task</DialogTitle></DialogHeader>
-                <form onSubmit={createTarget} className="space-y-4">
-                  <div className="space-y-2"><Label>Title</Label>
-                    <Input required value={tgtTitle} onChange={(e) => setTgtTitle(e.target.value)} maxLength={200} placeholder="e.g. Cold-call 100 leads" />
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-2"><Label>Month</Label>
-                      <Input type="month" value={tgtMonth} onChange={(e) => setTgtMonth(e.target.value)} />
-                    </div>
-                    <div className="space-y-2"><Label>Target count</Label>
-                      <Input type="number" min={1} value={tgtCount} onChange={(e) => setTgtCount(e.target.value)} placeholder="e.g. 100" required />
-                    </div>
-                  </div>
-                  <div className="space-y-2"><Label>Assign to</Label>
-                    <Select value={tgtAssignee} onValueChange={setTgtAssignee} required>
-                      <SelectTrigger><SelectValue placeholder="Select employee" /></SelectTrigger>
-                      <SelectContent>{employees.map((e) => <SelectItem key={e.id} value={e.id}>{e.full_name}</SelectItem>)}</SelectContent>
-                    </Select>
-                  </div>
-                  <Button type="submit" className="w-full" disabled={submitting}>
-                    {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Create Target'}
-                  </Button>
-                </form>
-              </DialogContent>
-            </Dialog>
-
-            <Dialog open={taskOpen} onOpenChange={setTaskOpen}>
-              <DialogTrigger asChild><Button><Plus className="h-4 w-4 mr-2" />New Task</Button></DialogTrigger>
-              <DialogContent>
-                <DialogHeader><DialogTitle>Create Task</DialogTitle></DialogHeader>
-                <form onSubmit={createTask} className="space-y-4">
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <Label>Title</Label>
-                      <Button 
-                        type="button" 
-                        variant="ghost" 
-                        size="sm" 
-                        className={`h-7 px-2 rounded-full ${isRecording ? 'text-destructive bg-destructive/10 animate-pulse' : 'text-primary'}`}
-                        onClick={() => {
-                          setIsRecording(!isRecording);
-                          if (!isRecording) {
-                            toast.info('Listening for task details...', { duration: 2000 });
-                            setTimeout(() => {
-                              setTitle('AI Transcribed: Fix legacy server issues');
-                              setDesc('Generated from voice: Please check the logs in the data center and resolve the timeout errors by Friday.');
-                              setIsRecording(false);
-                              toast.success('Voice transcribed via AI');
-                            }, 3000);
-                          }
-                        }}
-                      >
-                        {isRecording ? <MicOff className="h-3.5 w-3.5 mr-1" /> : <Mic className="h-3.5 w-3.5 mr-1" />}
-                        {isRecording ? 'Stop' : 'Voice-to-Task'}
-                      </Button>
-                    </div>
-                    <Input required value={title} onChange={(e) => setTitle(e.target.value)} maxLength={200} />
-                  </div>
-                  <div className="space-y-2"><Label>Description</Label><Textarea value={desc} onChange={(e) => setDesc(e.target.value)} rows={3} maxLength={1000} /></div>
-                  <div className="space-y-2">
-                    <Label className="flex items-center gap-1"><GitMerge className="h-3 w-3" /> Parent Task (Dependency)</Label>
-                    <Select value={parentTaskId} onValueChange={setParentTaskId}>
-                      <SelectTrigger><SelectValue placeholder="None (Standard Task)" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">None</SelectItem>
-                        {regular.filter(t => t.status !== 'completed').map((t) => (
-                          <SelectItem key={t.id} value={t.id}>{t.title}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <p className="text-[10px] text-muted-foreground italic">This task will be locked until the parent task is marked completed.</p>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-2"><Label>Priority</Label>
-                      <Select value={priority} onValueChange={(v) => setPriority(v as Priority)}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent><SelectItem value="low">Low</SelectItem><SelectItem value="medium">Medium</SelectItem><SelectItem value="high">High</SelectItem></SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2"><Label>Due Date</Label><Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} /></div>
-                  </div>
-                  <div className="space-y-2"><Label>Assign to</Label>
-                    <Select value={assignee} onValueChange={setAssignee} required>
-                      <SelectTrigger><SelectValue placeholder="Select employee" /></SelectTrigger>
-                      <SelectContent>{employees.map((e) => <SelectItem key={e.id} value={e.id}>{e.full_name}</SelectItem>)}</SelectContent>
-                    </Select>
-                  </div>
-                  <Button type="submit" className="w-full" disabled={submitting}>
-                    {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Create Task'}
-                  </Button>
-                </form>
-              </DialogContent>
-            </Dialog>
+            <Button variant="outline" size="sm" onClick={() => setCsvOpen(true)}>
+              <Upload className="h-3.5 w-3.5 mr-1.5" />Upload Excel / CSV
+            </Button>
+            <Button variant="outline" size="sm" onClick={exportCsv}>
+              <Download className="h-3.5 w-3.5 mr-1.5" />Export CSV
+            </Button>
           </div>
         </div>
 
-        <Card className="p-6">
-          <Tabs defaultValue="tasks">
-            <TabsList>
-              <TabsTrigger value="tasks">Tasks ({regular.length})</TabsTrigger>
-              <TabsTrigger value="targets">Monthly Targets ({targets.length})</TabsTrigger>
-            </TabsList>
-            <TabsContent value="tasks" className="mt-4">
-              {loading ? <div className="text-center py-12"><Loader2 className="h-6 w-6 animate-spin text-primary mx-auto" /></div>
-                : regular.length === 0 ? <p className="text-sm text-muted-foreground text-center py-12">No tasks yet.</p>
-                : <div className="space-y-3">{regular.map((t) => <TaskRow key={t.id} t={t} />)}</div>}
-            </TabsContent>
-            <TabsContent value="targets" className="mt-4">
-              {loading ? <div className="text-center py-12"><Loader2 className="h-6 w-6 animate-spin text-primary mx-auto" /></div>
-                : targets.length === 0 ? <p className="text-sm text-muted-foreground text-center py-12">No monthly targets yet.</p>
-                : <div className="space-y-3">{targets.map((t) => <TargetRow key={t.id} t={t} />)}</div>}
-            </TabsContent>
-          </Tabs>
-        </Card>
+        {/* Stats strip */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {([
+            { label: 'Total Tasks', value: stats.total, color: '#6366f1' },
+            { label: 'To Do', value: stats.todo, color: STATUS_COLORS.pending },
+            { label: 'In Progress', value: stats.progress, color: STATUS_COLORS.in_progress },
+            { label: 'Completed', value: stats.done, color: STATUS_COLORS.completed },
+          ]).map(s => (
+            <div key={s.label} className="rounded-xl border bg-card p-3.5 flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg flex items-center justify-center text-white text-sm font-bold" style={{ background: s.color }}>
+                {s.value}
+              </div>
+              <span className="text-xs font-medium text-muted-foreground">{s.label}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* Toolbar */}
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="relative flex-1 min-w-[200px] max-w-sm">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
+              placeholder="Search tasks..." className="w-full h-9 pl-9 pr-3 text-sm rounded-lg border bg-card outline-none focus:ring-2 focus:ring-primary/30 transition-all"
+            />
+          </div>
+          <div className="flex items-center gap-1.5">
+            <Filter className="w-3.5 h-3.5 text-muted-foreground" />
+            {(['all', 'pending', 'in_progress', 'completed'] as const).map(s => (
+              <button key={s} onClick={() => setFilterStatus(s)}
+                className={`px-2.5 py-1 text-xs rounded-md font-medium transition-all ${filterStatus === s ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:bg-accent'}`}
+              >
+                {s === 'all' ? 'All' : STATUS_LABELS[s]}
+              </button>
+            ))}
+          </div>
+          {selected.size > 0 && (
+            <Button variant="destructive" size="sm" onClick={bulkDelete}>
+              <Trash2 className="w-3.5 h-3.5 mr-1.5" />Delete {selected.size}
+            </Button>
+          )}
+        </div>
+
+        {/* Spreadsheet grid */}
+        <div className="rounded-xl border bg-card overflow-hidden shadow-sm">
+          <div className="overflow-x-auto">
+            {/* Header row */}
+            <div className="grid items-center border-b bg-muted/40 sticky top-0 z-10"
+              style={{ gridTemplateColumns: gridTemplate, minWidth: 800 }}
+            >
+              <div className="flex items-center justify-center h-10 border-r border-border/50">
+                <Checkbox checked={allSelected}
+                  onCheckedChange={() => {
+                    if (allSelected) setSelected(new Set());
+                    else setSelected(new Set(filtered.map(t => t.id)));
+                  }}
+                />
+              </div>
+              {columns.map(col => (
+                <div key={col.key}
+                  onClick={() => col.key !== 'actions' && toggleSort(col.key)}
+                  className={`flex items-center gap-1 px-3 h-10 text-xs font-semibold text-muted-foreground uppercase tracking-wider select-none border-r border-border/50 last:border-r-0 ${col.key !== 'actions' ? 'cursor-pointer hover:bg-accent/30 transition-colors' : ''}`}
+                >
+                  {col.label}
+                  {sortCol === col.key && <ArrowUpDown className="w-3 h-3 opacity-60" />}
+                </div>
+              ))}
+            </div>
+
+            {/* Body */}
+            {loading ? (
+              <div className="flex items-center justify-center py-20">
+                <Loader2 className="w-6 h-6 animate-spin text-primary" />
+              </div>
+            ) : filtered.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
+                <p className="text-sm">No tasks found</p>
+                <p className="text-xs mt-1">Click "+ Add Task" below to create one</p>
+              </div>
+            ) : (
+              filtered.map((task, idx) => (
+                <div key={task.id}
+                  className={`grid items-center border-b border-border/30 transition-colors group ${selected.has(task.id) ? 'bg-primary/5' : idx % 2 === 0 ? 'bg-transparent' : 'bg-muted/15'} hover:bg-accent/30`}
+                  style={{ gridTemplateColumns: gridTemplate, minWidth: 800 }}
+                >
+                  {/* Checkbox */}
+                  <div className="flex items-center justify-center h-full border-r border-border/30 py-1.5">
+                    <Checkbox checked={selected.has(task.id)}
+                      onCheckedChange={() => setSelected(prev => {
+                        const n = new Set(prev);
+                        n.has(task.id) ? n.delete(task.id) : n.add(task.id);
+                        return n;
+                      })}
+                    />
+                  </div>
+
+                  {/* Title */}
+                  <div className="border-r border-border/30 py-0.5 px-1">
+                    <EditableCell key={`title-${task.id}`} value={task.title} placeholder="Task name..."
+                      onChange={v => updateField(task.id, 'title', v)} className="font-medium"
+                    />
+                  </div>
+
+                  {/* Status */}
+                  <div className="border-r border-border/30 py-1 px-2">
+                    <CellDropdown key={`status-${task.id}`} value={task.status}
+                      options={['pending', 'in_progress', 'completed']}
+                      colorMap={STATUS_COLORS} labelMap={STATUS_LABELS}
+                      onChange={v => updateField(task.id, 'status', v)}
+                    />
+                  </div>
+
+                  {/* Priority */}
+                  <div className="border-r border-border/30 py-1 px-2">
+                    <CellDropdown key={`priority-${task.id}`} value={task.priority}
+                      options={['low', 'medium', 'high']}
+                      colorMap={PRIORITY_COLORS}
+                      labelMap={{ low: 'Low', medium: 'Medium', high: 'High' }}
+                      onChange={v => updateField(task.id, 'priority', v)}
+                    />
+                  </div>
+
+                  {/* Assignee */}
+                  <div className="border-r border-border/30 py-0.5">
+                    <AssigneeCell key={`assignee-${task.id}`} value={task.assigned_to} employees={employees}
+                      onChange={id => updateField(task.id, 'assigned_to', id)}
+                    />
+                  </div>
+
+                  {/* Due date */}
+                  <div className="border-r border-border/30 py-0.5 px-1">
+                    <EditableCell value={task.due_date ?? ''} type="date"
+                      placeholder="No date" onChange={v => updateField(task.id, 'due_date', v || null)}
+                    />
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex items-center justify-center py-1">
+                    <button onClick={() => removeOne(task.id)} disabled={busyIds.has(task.id)}
+                      className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors opacity-0 group-hover:opacity-100"
+                    >
+                      {busyIds.has(task.id) ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+
+            {/* Add new row */}
+            <div className="grid items-center bg-muted/10 border-t border-dashed border-border/50"
+              style={{ gridTemplateColumns: gridTemplate, minWidth: 800 }}
+            >
+              <div className="flex items-center justify-center h-10 border-r border-border/30">
+                <Plus className="w-3.5 h-3.5 text-primary/60" />
+              </div>
+              <div className="col-span-5 px-2 py-1.5 border-r border-border/30">
+                <div className="flex items-center gap-2">
+                  <input ref={newInputRef} value={newTitle} onChange={e => setNewTitle(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter' && newTitle.trim()) addRow(); }}
+                    placeholder="+ Add a new task... (press Enter)"
+                    className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground/50 py-1"
+                  />
+                  {newTitle.trim() && (
+                    <div className="flex items-center gap-1">
+                      <Button size="sm" variant="ghost" className="h-6 px-2 text-xs" disabled={adding} onClick={addRow}>
+                        {adding ? <Loader2 className="w-3 h-3 animate-spin" /> : <><Check className="w-3 h-3 mr-1" />Add</>}
+                      </Button>
+                      <Button size="sm" variant="ghost" className="h-6 px-1.5 text-xs text-muted-foreground" onClick={() => setNewTitle('')}>
+                        <X className="w-3 h-3" />
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div />
+            </div>
+          </div>
+        </div>
+
+        {/* Footer info */}
+        <p className="text-xs text-muted-foreground text-center">
+          {filtered.length} task{filtered.length !== 1 ? 's' : ''} · Click any cell to edit inline · All changes auto-save
+        </p>
+
+        {/* CSV Upload Modal */}
+        {csvOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in-0 duration-200">
+            <div className="bg-card border rounded-2xl shadow-2xl w-full max-w-2xl mx-4 max-h-[85vh] flex flex-col animate-in zoom-in-95 duration-200">
+              {/* Modal header */}
+              <div className="flex items-center justify-between p-5 border-b">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                    <FileSpreadsheet className="w-5 h-5 text-primary" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-heading font-bold">Import from Excel / CSV</h2>
+                    <p className="text-xs text-muted-foreground">Upload a file to bulk-create tasks & targets</p>
+                  </div>
+                </div>
+                <button onClick={() => { setCsvOpen(false); setCsvData([]); setCsvHeaders([]); setCsvAssignee(''); setCsvFileName(''); }}
+                  className="p-1.5 rounded-lg hover:bg-accent transition-colors">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Modal body */}
+              <div className="p-5 overflow-y-auto flex-1">
+                {csvData.length === 0 ? (
+                  <>
+                    {/* Drop zone */}
+                    <div
+                      onDragOver={e => { e.preventDefault(); setCsvDragOver(true); }}
+                      onDragLeave={() => setCsvDragOver(false)}
+                      onDrop={e => { e.preventDefault(); setCsvDragOver(false); const f = e.dataTransfer.files[0]; if (f) handleFile(f); }}
+                      onClick={() => csvInputRef.current?.click()}
+                      className={`border-2 border-dashed rounded-xl p-10 text-center cursor-pointer transition-all ${
+                        csvDragOver ? 'border-primary bg-primary/5 scale-[1.01]' : 'border-border hover:border-primary/40 hover:bg-accent/30'
+                      }`}
+                    >
+                      <FileSpreadsheet className="w-10 h-10 mx-auto mb-3 text-muted-foreground" />
+                      <p className="text-sm font-medium">Drop your Excel or CSV file here</p>
+                      <p className="text-xs text-muted-foreground mt-1.5">Supports .xlsx, .xls, and .csv files</p>
+                      <input ref={csvInputRef} type="file" accept=".csv,.xlsx,.xls" className="hidden"
+                        onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f); e.target.value = ''; }}
+                      />
+                    </div>
+
+                    {/* Expected format */}
+                    <div className="mt-5 p-4 rounded-xl bg-muted/40 border">
+                      <div className="flex items-center gap-2 mb-2">
+                        <AlertCircle className="w-3.5 h-3.5 text-primary" />
+                        <p className="text-xs font-semibold">Supported Columns (auto-detected from your file)</p>
+                      </div>
+                      <div className="text-xs text-muted-foreground space-y-1">
+                        <p>Headers are read automatically from your file. Recognized columns:</p>
+                        <div className="flex flex-wrap gap-1.5 mt-2">
+                          {['SR NO', 'TEAM', 'TARGET', 'ACHIEVE TARGET', 'SBI', 'HDFC', 'PENDING POINT', 'Title', 'Priority', 'Status', 'Due Date'].map(col => (
+                            <span key={col} className="px-2 py-0.5 rounded-md bg-primary/10 text-primary font-mono text-[10px] font-medium">{col}</span>
+                          ))}
+                        </div>
+                        <p className="mt-2 italic">All columns from your Excel are preserved. You'll assign an employee after upload.</p>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    {/* File info + Assign employee */}
+                    <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+                      <div>
+                        <p className="text-sm font-medium">
+                          <span className="text-primary font-bold">{csvData.length}</span> row{csvData.length !== 1 ? 's' : ''} found
+                          {csvFileName && <span className="text-muted-foreground ml-2 text-xs">from {csvFileName}</span>}
+                        </p>
+                      </div>
+                      <Button variant="ghost" size="sm" className="text-xs" onClick={() => { setCsvData([]); setCsvHeaders([]); setCsvFileName(''); }}>
+                        <X className="w-3 h-3 mr-1" />Clear
+                      </Button>
+                    </div>
+
+                    {/* Employee assignment */}
+                    <div className="mb-4 p-3 rounded-xl border bg-muted/20">
+                      <div className="flex items-center gap-2 mb-2">
+                        <UserCheck className="w-4 h-4 text-primary" />
+                        <p className="text-sm font-semibold">Assign to Employee</p>
+                      </div>
+                      <select value={csvAssignee} onChange={e => setCsvAssignee(e.target.value)}
+                        className="w-full h-9 px-3 text-sm rounded-lg border bg-background outline-none focus:ring-2 focus:ring-primary/30">
+                        <option value="">— Select an employee —</option>
+                        {employees.map(e => <option key={e.id} value={e.id}>{e.full_name}</option>)}
+                      </select>
+                    </div>
+                    <div className="border rounded-lg overflow-hidden">
+                      <div className="overflow-x-auto max-h-[300px]">
+                        <table className="w-full text-xs">
+                          <thead className="bg-muted/50 sticky top-0">
+                            <tr>
+                              <th className="px-3 py-2 text-left font-semibold text-muted-foreground">#</th>
+                              {csvHeaders.map(h => (
+                                <th key={h} className="px-3 py-2 text-left font-semibold text-muted-foreground uppercase tracking-wider">{h}</th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {csvData.slice(0, 50).map((row, i) => (
+                              <tr key={i} className={`border-t border-border/30 ${i % 2 === 0 ? '' : 'bg-muted/15'}`}>
+                                <td className="px-3 py-1.5 text-muted-foreground">{i + 1}</td>
+                                {csvHeaders.map(h => (
+                                  <td key={h} className="px-3 py-1.5 max-w-[200px] truncate">{row[h] || '—'}</td>
+                                ))}
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                      {csvData.length > 50 && (
+                        <p className="text-[10px] text-muted-foreground text-center py-1.5 bg-muted/30 border-t">Showing first 50 of {csvData.length} rows</p>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* Modal footer */}
+              {csvData.length > 0 && (
+                <div className="p-5 border-t bg-muted/20 space-y-3">
+                  {!csvAssignee && (
+                    <div className="flex items-center gap-2 p-2.5 rounded-lg bg-warning/10 border border-warning/30">
+                      <AlertCircle className="w-4 h-4 text-warning shrink-0" />
+                      <p className="text-xs text-warning font-medium">Please select an employee above to assign these tasks</p>
+                    </div>
+                  )}
+                  <div className="flex items-center justify-between gap-3">
+                    <Button variant="outline" onClick={() => { setCsvOpen(false); setCsvData([]); setCsvHeaders([]); setCsvAssignee(''); setCsvFileName(''); }}>
+                      Cancel
+                    </Button>
+                    <Button
+                      disabled={csvUploading || !csvAssignee}
+                      onClick={importFile}
+                      className="px-6 py-2.5 text-sm font-semibold shadow-lg hover:shadow-xl transition-all"
+                      style={{ background: csvAssignee ? undefined : undefined }}
+                    >
+                      {csvUploading ? (
+                        <><Loader2 className="w-4 h-4 animate-spin mr-2" />Submitting...</>
+                      ) : (
+                        <><UserCheck className="w-4 h-4 mr-2" />Assign & Submit {csvData.length} Row{csvData.length !== 1 ? 's' : ''}</>
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </DashboardLayout>
   );

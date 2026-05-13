@@ -55,6 +55,79 @@ Deno.serve(async (req) => {
     }
 
     // ---------------------------------------------------------
+    // ACTION: Update User (Email, Password, Name)
+    // ---------------------------------------------------------
+    if (body.action === 'update-user') {
+      const { userId, email, password, full_name } = body;
+      const { data: roles } = await supabaseAdmin.from('user_roles').select('role').eq('user_id', caller.id);
+      const isAuthorized = roles?.some(r => r.role === 'admin' || r.role === 'super_admin');
+
+      if (!isAuthorized) {
+        return new Response(JSON.stringify({ success: false, error: 'Forbidden: Admin only' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+
+      const updates: any = {};
+      if (email) updates.email = email;
+      if (password) updates.password = password;
+      if (full_name) {
+         updates.user_metadata = { full_name };
+      }
+
+      if (Object.keys(updates).length > 0) {
+        const { error: updateErr } = await supabaseAdmin.auth.admin.updateUserById(userId, updates);
+        if (updateErr) {
+          return new Response(JSON.stringify({ success: false, error: updateErr.message }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        }
+      }
+
+      // Also update profiles table
+      if (full_name || email) {
+        const profileUpdates: any = {};
+        if (full_name) profileUpdates.full_name = full_name;
+        if (email) profileUpdates.email = email;
+        await supabaseAdmin.from('profiles').update(profileUpdates).eq('id', userId);
+      }
+
+      return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
+    // ---------------------------------------------------------
+    // ACTION: Create Admin (Called after creating company directly)
+    // ---------------------------------------------------------
+    if (body.action === 'create-admin') {
+      const { company_id, owner: ownerData } = body;
+      const { data: roles } = await supabaseAdmin.from('user_roles').select('role').eq('user_id', caller.id);
+      if (!roles?.some((r) => r.role === 'super_admin')) {
+        return new Response(JSON.stringify({ success: false, error: 'Super Admin only' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+
+      // Create the user
+      const { data: createdUser, error: uErr } = await supabaseAdmin.auth.admin.createUser({
+        email: ownerData.email.trim(), password: ownerData.password, email_confirm: true,
+        user_metadata: { full_name: ownerData.full_name.trim(), company_id: company_id },
+      });
+      if (uErr) throw new Error(uErr.message);
+
+      const ownerId = createdUser.user.id;
+      
+      // Upsert profile and assign to company
+      await supabaseAdmin.from('profiles').upsert({
+        id: ownerId, email: ownerData.email.trim(), full_name: ownerData.full_name.trim(),
+        department: 'Management', job_title: 'Administrator', status: 'approved', company_id: company_id,
+      });
+      
+      // Make them admin
+      await supabaseAdmin.from('user_roles').upsert({ user_id: ownerId, role: 'admin' });
+      
+      // Set as company owner
+      await supabaseAdmin.from('companies').update({ owner_id: ownerId }).eq('id', company_id);
+
+      return new Response(JSON.stringify({ success: true, user: { id: ownerId } }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // ---------------------------------------------------------
     // ACTION: Provision (Original behavior)
     // ---------------------------------------------------------
     // ... (keeping original provision code)
@@ -66,7 +139,10 @@ Deno.serve(async (req) => {
       }
 
       const { data: company, error: cErr } = await supabaseAdmin.from('companies').insert({
-        name: compData.name.trim(), slug: compData.slug.toLowerCase().trim(), status: 'active',
+        name: compData.name.trim(), 
+        slug: compData.slug.toLowerCase().trim(), 
+        status: 'active',
+        logo_url: compData.logo_url || null,
       }).select().single();
       if (cErr) throw new Error(cErr.message);
 
