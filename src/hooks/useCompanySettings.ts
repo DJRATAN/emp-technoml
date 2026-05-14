@@ -42,6 +42,24 @@ export function useCompanySettings() {
         logo_url: (companyRes.data as any)?.logo_url,
         theme_color: (companyRes.data as any)?.theme_color,
       } as CompanySettings);
+    } else {
+      setSettings({
+        company_id: user?.companyId ?? '',
+        company_name: '',
+        office_latitude: 0,
+        office_longitude: 0,
+        geofence_radius_m: 0,
+        work_start_time: '',
+        work_end_time: '',
+        late_threshold_minutes: 0,
+        annual_leave_quota: 0,
+        sick_leave_quota: 0,
+        casual_leave_quota: 0,
+        leave_approval_sla_hours: 48,
+        face_recognition_sensitivity: 0.5,
+        logo_url: null,
+        theme_color: null,
+      } as CompanySettings);
     }
     setLoading(false);
   }, [user?.companyId]);
