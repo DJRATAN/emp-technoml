@@ -12,7 +12,7 @@ import { toast } from 'sonner';
 
 type Step = 'company' | 'auth' | 'reset';
 type Mode = 'login' | 'signup';
-interface CompanyOption { id: string; name: string; slug: string; }
+interface CompanyOption { id: string; name: string; slug: string; login_preference?: 'email' | 'id' | 'both'; }
 
 export default function LoginPage() {
   const { login, isAuthenticated, user, loading } = useAuth();
@@ -55,7 +55,7 @@ export default function LoginPage() {
     debounceRef.current = window.setTimeout(async () => {
       setSearching(true);
       const { data } = await supabase.from('companies')
-        .select('id, name, slug')
+        .select('id, name, slug, login_preference')
         .eq('status', 'active')
         .or(`name.ilike.%${q}%,slug.ilike.%${q}%`)
         .order('name')
@@ -78,7 +78,26 @@ export default function LoginPage() {
     e.preventDefault();
     if (!selected) return;
     setSubmitting(true); setError(null);
-    const { error: err } = await login(selected.slug, email.trim(), password);
+
+    let loginEmail = email.trim();
+    const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(loginEmail);
+
+    // If it's not an email, try to resolve it as an Employee ID (case-insensitive)
+    if (!isEmail) {
+      const { data, error: rpcErr } = await (supabase as any).rpc('resolve_email_by_employee_id', {
+        p_employee_id: loginEmail.toUpperCase(),
+        p_company_slug: selected.slug
+      });
+
+      if (rpcErr || !data) {
+        setSubmitting(false);
+        setError('Invalid login details. Please check your ID and try again.');
+        return;
+      }
+      loginEmail = data;
+    }
+
+    const { error: err } = await login(selected.slug, loginEmail, password);
     setSubmitting(false);
     if (err) { setError(err); return; }
     toast.success(`Welcome back to ${selected.name}!`);
@@ -225,7 +244,9 @@ export default function LoginPage() {
                   {mode === 'login' ? 'Welcome to' : 'Join'} {selected?.name}
                 </h2>
                 <p className="text-sm text-muted-foreground mt-1">
-                  {mode === 'login' ? 'Sign in with your work credentials' : 'Create your account — admin will approve it'}
+                  {mode === 'login' 
+                    ? (selected?.login_preference === 'id' ? 'Sign in with your Employee ID' : 'Sign in with your work credentials') 
+                    : 'Create your account — admin will approve it'}
                 </p>
               </div>
 
@@ -249,8 +270,19 @@ export default function LoginPage() {
               )}
 
               <div className="space-y-2">
-                <Label htmlFor="login-email"><Mail className="inline h-3 w-3 mr-1" />Email</Label>
-                <Input id="login-email" type="email" required autoComplete="email"
+                <Label htmlFor="login-email">
+                  {mode === 'login' ? (
+                    selected?.login_preference === 'email' ? <><Mail className="inline h-3 w-3 mr-1" />Email Address</> :
+                    selected?.login_preference === 'id' ? <><Shield className="inline h-3 w-3 mr-1" />Employee ID</> :
+                    <><Mail className="inline h-3 w-3 mr-1" />Email or Employee ID</>
+                  ) : <><Mail className="inline h-3 w-3 mr-1" />Email Address</>}
+                </Label>
+                <Input id="login-email" required
+                  placeholder={mode === 'login' ? (
+                    selected?.login_preference === 'email' ? 'email@company.com' :
+                    selected?.login_preference === 'id' ? 'e.g. TML-001' :
+                    'Email or ID'
+                  ) : 'email@company.com'}
                   value={email} onChange={(e) => setEmail(e.target.value)} />
               </div>
               <div className="space-y-2">

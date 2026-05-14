@@ -20,6 +20,7 @@ export interface AppUser {
   jobTitle?: string | null;
   phone?: string | null;
   avatarUrl?: string | null;
+  employeeId?: string | null;
 }
 
 interface AuthContextType {
@@ -105,6 +106,7 @@ async function loadAppUser(sbUser: SbUser): Promise<AppUser | null> {
     jobTitle: profile.job_title,
     phone: profile.phone,
     avatarUrl: profile.avatar_url,
+    employeeId: profile.employee_internal_id,
   };
 }
 

@@ -3,10 +3,10 @@ import { supabase } from '@/integrations/supabase/client';
 import {
   LayoutDashboard, Clock, CheckSquare, CalendarDays, TrendingUp,
   User, Users, FileBarChart, Settings, Building2, Globe, Target, MapPin,
-  Award, MessageSquare, LifeBuoy, ToggleLeft, GitBranch, Megaphone, Mail, HeartPulse, DollarSign, Shield
+  Award, MessageSquare, LifeBuoy, ToggleLeft, GitBranch, Megaphone, Mail, HeartPulse, DollarSign, Shield, IdCard
 } from 'lucide-react';
 import {
-  Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent,
+  Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupContent,
   SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem,
   useSidebar,
 } from '@/components/ui/sidebar';
@@ -72,7 +72,7 @@ export function AppSidebar() {
   ];
 
   const menu = user?.role === 'super_admin' ? superAdminMenu
-    : user?.role === 'admin' ? adminMenu : employeeMenu;
+    : (user?.role === 'admin' || user?.isOwner) ? adminMenu : employeeMenu;
 
 
   return (
@@ -114,6 +114,23 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
+      <SidebarFooter className="border-t p-4 bg-sidebar-accent/20">
+        {!collapsed ? (
+          <div className="flex flex-col gap-1 overflow-hidden">
+            <p className="text-sm font-medium truncate">{user?.name}</p>
+            {user?.employeeId && (
+              <p className="text-[10px] font-mono text-primary flex items-center gap-1">
+                <IdCard className="h-3 w-3" /> {user.employeeId}
+              </p>
+            )}
+            <p className="text-[10px] text-muted-foreground truncate">{user?.email}</p>
+          </div>
+        ) : (
+          <div className="flex justify-center">
+            <User className="h-4 w-4 text-muted-foreground" />
+          </div>
+        )}
+      </SidebarFooter>
     </Sidebar>
   );
 }

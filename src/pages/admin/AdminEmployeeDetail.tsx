@@ -24,7 +24,7 @@ type UserRole = 'employee' | 'admin' | 'super_admin';
 type ProfileForm = {
   full_name: string; phone: string; department: string; job_title: string;
   emergency_contact: string; address: string; date_of_birth: string;
-  avatar_url: string; id_card_url: string;
+  avatar_url: string; id_card_url: string; employee_internal_id: string;
 };
 
 type ProfileMeta = {
@@ -52,6 +52,7 @@ export default function AdminEmployeeDetail() {
   const [form, setForm] = useState<ProfileForm>({
     full_name: '', phone: '', department: '', job_title: '',
     emergency_contact: '', address: '', date_of_birth: '', avatar_url: '', id_card_url: '',
+    employee_internal_id: '',
   });
   const [meta, setMeta] = useState<ProfileMeta>({
     status: 'pending', is_active: true, force_password_change: false,
@@ -62,6 +63,7 @@ export default function AdminEmployeeDetail() {
   const [role, setRole] = useState<UserRole>('employee');
   const [permissions, setPermissions] = useState<any>(null);
   const [permSaving, setPermSaving] = useState(false);
+  const [isIdPermanent, setIsIdPermanent] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [roleSaving, setRoleSaving] = useState(false);
@@ -87,14 +89,9 @@ export default function AdminEmployeeDetail() {
 
     try {
       console.log('Initiating password reset for user ID:', id);
-      const { data, error } = await supabase.functions.invoke('bootstrap-admin', {
-        body: { 
-          userId: id, 
-          action: 'password',
-          newPassword: newPassword.trim(),
-          adminId: user?.id,
-          companyId: user?.companyId,
-        }
+      const { data, error } = await (supabase as any).rpc('admin_reset_password', {
+        p_user_id: id, 
+        p_new_password: newPassword.trim()
       });
 
       if (error || !data.success) {
@@ -143,7 +140,9 @@ export default function AdminEmployeeDetail() {
           date_of_birth: (pData as any).date_of_birth ?? '',
           avatar_url: (pData as any).avatar_url ?? '',
           id_card_url: (pData as any).id_card_url ?? '',
+          employee_internal_id: (pData as any).employee_internal_id ?? '',
         });
+        setIsIdPermanent(!!(pData as any).employee_internal_id);
         setMeta({
           status: (pData as any).status ?? 'pending',
           is_active: (pData as any).is_active ?? true,
@@ -208,9 +207,11 @@ export default function AdminEmployeeDetail() {
       emergency_contact: form.emergency_contact?.trim() || null,
       address: form.address?.trim() || null,
       date_of_birth: form.date_of_birth || null,
+      employee_internal_id: form.employee_internal_id?.trim() || null,
     } as any).eq('id', id);
     setSaving(false);
     if (error) return toast.error(error.message);
+    if (form.employee_internal_id) setIsIdPermanent(true);
     toast.success('Profile updated');
   }
 
@@ -788,6 +789,34 @@ export default function AdminEmployeeDetail() {
             <div className="space-y-2">
               <Label className="flex items-center gap-1"><User className="h-3 w-3" /> Full Name</Label>
               <Input value={form.full_name} onChange={(e) => update('full_name', e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label className="flex items-center gap-1 font-bold text-primary"><Shield className="h-3 w-3" /> Employee ID</Label>
+              <div className="flex gap-2">
+                <Input 
+                  className="flex-1 font-mono uppercase" 
+                  value={form.employee_internal_id} 
+                  onChange={(e) => update('employee_internal_id', e.target.value.toUpperCase())} 
+                  placeholder="e.g. TML-26-001" 
+                  disabled={isIdPermanent}
+                />
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  size="sm" 
+                  className="whitespace-nowrap" 
+                  disabled={isIdPermanent}
+                  onClick={async () => {
+                    if (!user?.companyId) return toast.error('Company not found');
+                    const { data, error } = await (supabase as any).rpc('get_next_employee_id', { p_company_id: user.companyId });
+                    if (error) { toast.error('Auto-generate failed: ' + error.message); return; }
+                    if (data) { update('employee_internal_id', data); toast.success(`Suggested ID: ${data}`); }
+                  }}
+                >
+                  ⚡ Auto-Generate
+                </Button>
+              </div>
+              <p className="text-[10px] text-muted-foreground">Format: PREFIX-YY-NNN (case-insensitive for login). Click Auto-Generate to get the next available ID.</p>
             </div>
             <div className="space-y-2">
               <Label className="flex items-center gap-1"><Mail className="h-3 w-3" /> Email</Label>

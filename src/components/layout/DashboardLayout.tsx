@@ -26,12 +26,12 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { items, count } = useAdminNotifications();
   const { theme, toggle } = useTheme();
   const navigate = useNavigate();
-  const showAdminNotifications = user?.role === 'admin' || user?.role === 'super_admin';
+  const showAdminNotifications = user?.role === 'admin' || user?.role === 'super_admin' || user?.isOwner;
   const showUserNotifications = !!user;
 
   const profilePath =
-    user?.role === 'employee' ? '/employee/profile'
-    : user?.role === 'admin' ? '/admin/settings'
+    user?.role === 'employee' && !user?.isOwner ? '/employee/profile'
+    : (user?.role === 'admin' || user?.isOwner) ? '/admin/settings'
     : '/super-admin';
 
   const handleLogout = async () => {
@@ -107,14 +107,19 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
                 <DropdownMenuContent align="end" className="w-56">
                   <DropdownMenuLabel>
                     <div className="font-medium truncate">{user?.name}</div>
-                    <div className="text-xs text-muted-foreground truncate font-normal">{user?.email}</div>
+                    <div className="text-[10px] text-muted-foreground truncate font-normal">{user?.email}</div>
+                    {user?.employeeId && (
+                      <div className="mt-1.5 py-0.5 px-2 rounded-md bg-primary/10 text-primary text-[10px] font-mono inline-block">
+                        ID: {user.employeeId}
+                      </div>
+                    )}
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
                   {user?.role !== 'super_admin' && (
                     <>
                       <DropdownMenuItem onClick={() => navigate(profilePath)}>
-                        {user?.role === 'admin' ? <Settings className="h-4 w-4 mr-2" /> : <UserIcon className="h-4 w-4 mr-2" />}
-                        {user?.role === 'admin' ? 'Settings' : 'Profile'}
+                        {(user?.role === 'admin' || user?.isOwner) ? <Settings className="h-4 w-4 mr-2" /> : <UserIcon className="h-4 w-4 mr-2" />}
+                        {(user?.role === 'admin' || user?.isOwner) ? 'Settings' : 'Profile'}
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
                     </>

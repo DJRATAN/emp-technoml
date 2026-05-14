@@ -64,7 +64,7 @@ function NavigationDebugger() {
       
       const home = !isAuthenticated || !user ? '/' 
         : user.role === 'super_admin' ? '/super-admin' 
-        : (user.role === 'admin' ? '/admin' : '/employee');
+        : (user.role === 'admin' || user.isOwner) ? '/admin' : '/employee';
         
       navigate(home, { replace: true });
     }
@@ -99,8 +99,10 @@ function ProtectedRoute({ children, allow }: { children: React.ReactNode; allow:
   if (loading) return <FullscreenLoader />;
   if (!isAuthenticated || !user) return <Navigate to="/" replace />;
   if (user.status !== 'approved' && user.role !== 'super_admin') return <Navigate to="/pending" replace />;
-  if (!allow.includes(user.role)) {
-    const home = user.role === 'super_admin' ? '/super-admin' : (user.role === 'admin' ? '/admin' : `/${user.role}`);
+  // Company owners get admin-level access
+  const hasAccess = allow.includes(user.role) || (user.isOwner && allow.includes('admin'));
+  if (!hasAccess) {
+    const home = user.role === 'super_admin' ? '/super-admin' : (user.role === 'admin' || user.isOwner) ? '/admin' : `/${user.role}`;
     return <Navigate to={home} replace />;
   }
   return <>{children}</>;
@@ -113,8 +115,8 @@ function AppRoutes() {
 
   const homeRedirect = isAuthenticated && user
     ? (user.role === 'super_admin' ? '/super-admin'
-        : user.role === 'employee' && user.status !== 'approved' ? '/pending'
-        : (user.role === 'admin' ? '/admin' : `/${user.role}`))
+        : user.role === 'employee' && user.status !== 'approved' && !user.isOwner ? '/pending'
+        : (user.role === 'admin' || user.isOwner) ? '/admin' : `/${user.role}`)
     : null;
 
   return (

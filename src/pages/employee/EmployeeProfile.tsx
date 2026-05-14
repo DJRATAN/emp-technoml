@@ -17,6 +17,7 @@ type ProfileData = {
   date_of_birth: string | null;
   id_card_url: string | null;
   avatar_url: string | null;
+  employee_internal_id: string | null;
 };
 
 type Doc = { id: string; document_type: string; file_name: string; storage_path: string; created_at: string };
@@ -34,7 +35,7 @@ export default function EmployeeProfile() {
     (async () => {
       const { data } = await supabase
         .from('profiles')
-        .select('full_name, phone, department, job_title, emergency_contact, address, date_of_birth, id_card_url, avatar_url')
+        .select('full_name, phone, department, job_title, emergency_contact, address, date_of_birth, id_card_url, avatar_url, employee_internal_id')
         .eq('id', user.id)
         .maybeSingle();
       if (data) {
@@ -71,6 +72,7 @@ export default function EmployeeProfile() {
   const p = profile;
   const fields = [
     { icon: User, label: 'Full Name', value: p?.full_name },
+    { icon: IdCard, label: 'Employee ID', value: p?.employee_internal_id },
     { icon: Mail, label: 'Email', value: user?.email },
     { icon: Building2, label: 'Department', value: p?.department },
     { icon: Briefcase, label: 'Job Title', value: p?.job_title },
@@ -107,7 +109,7 @@ export default function EmployeeProfile() {
             )}
             <div>
               <h3 className="font-heading font-semibold text-lg">{p?.full_name}</h3>
-              <p className="text-sm text-muted-foreground">{p?.department || '—'} · {p?.job_title || '—'}</p>
+              <p className="text-sm text-muted-foreground">{p?.department || '—'} · {p?.job_title || '—'} · <span className="font-mono text-primary">{p?.employee_internal_id || 'ID Pending'}</span></p>
             </div>
           </div>
 

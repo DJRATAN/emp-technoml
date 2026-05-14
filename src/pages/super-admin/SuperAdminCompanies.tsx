@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, Plus, Building2, Users, Clock, Shield, UserCog, UserCheck, Lock, Globe, Trash2 } from 'lucide-react';
+import { Loader2, Plus, Building2, Users, Clock, Shield, UserCog, UserCheck, Lock, Globe, Trash2, Check, X } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   AlertDialog,
@@ -19,6 +19,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface CompanyRow {
   id: string;
@@ -35,6 +42,8 @@ interface CompanyRow {
   email?: string | null;
   phone?: string | null;
   address?: string | null;
+  login_preference?: 'email' | 'id' | 'both';
+  employee_id_prefix?: string | null;
 }
 
 const ALL_FEATURES = [
@@ -79,6 +88,8 @@ export default function SuperAdminCompanies() {
   const [companyPhone, setCompanyPhone] = useState('');
   const [companyAddress, setCompanyAddress] = useState('');
   const [companyThemeColor, setCompanyThemeColor] = useState('#0ea5e9');
+  const [loginPreference, setLoginPreference] = useState<'email' | 'id' | 'both'>('both');
+  const [idPrefix, setIdPrefix] = useState('');
 
   const [editOpen, setEditOpen] = useState(false);
   const [editingCompany, setEditingCompany] = useState<CompanyRow | null>(null);
@@ -90,6 +101,8 @@ export default function SuperAdminCompanies() {
   const [editEmail, setEditEmail] = useState('');
   const [editPhone, setEditPhone] = useState('');
   const [editAddress, setEditAddress] = useState('');
+  const [editLoginPreference, setEditLoginPreference] = useState<'email' | 'id' | 'both'>('both');
+  const [editIdPrefix, setEditIdPrefix] = useState('');
   
   const [editOwnerName, setEditOwnerName] = useState('');
   const [editOwnerEmail, setEditOwnerEmail] = useState('');
@@ -170,12 +183,9 @@ export default function SuperAdminCompanies() {
     if (!resettingUserId || resetPassword.length < 6) return toast.error('Password must be at least 6 characters');
     setIsResetting(true);
     try {
-      const { data, error } = await supabase.functions.invoke('bootstrap-admin', {
-        body: { 
-          userId: resettingUserId, 
-          newPassword: resetPassword,
-          action: 'password'
-        },
+      const { data, error } = await (supabase as any).rpc('admin_reset_password', {
+        p_user_id: resettingUserId, 
+        p_new_password: resetPassword
       });
       if (error || !data?.success) throw new Error(data?.error || error?.message || 'Failed to reset password');
       toast.success('Password updated successfully');
@@ -246,9 +256,38 @@ export default function SuperAdminCompanies() {
   }, [loadPending]);
 
   async function approveUser(id: string) {
-    const { error } = await supabase.from('profiles').update({ status: 'approved' }).eq('id', id);
-    if (error) return toast.error(error.message);
+    console.log('Approving user:', id);
+    const { data, error } = await supabase
+      .from('profiles')
+      .update({ status: 'approved' } as any)
+      .eq('id', id)
+      .select('id, status');
+    console.log('Approve result:', { data, error });
+    if (error) return toast.error('Approve failed: ' + error.message);
+    if (!data || data.length === 0) {
+      toast.error('Update blocked by RLS policy. Check database permissions.');
+      return;
+    }
     toast.success('User approved');
+    loadPending();
+    load();
+  }
+
+  async function rejectUser(id: string) {
+    console.log('Rejecting user:', id);
+    const { data, error } = await supabase
+      .from('profiles')
+      .update({ status: 'rejected' } as any)
+      .eq('id', id)
+      .select('id, status');
+    console.log('Reject result:', { data, error });
+    if (error) return toast.error('Reject failed: ' + error.message);
+    if (!data || data.length === 0) {
+      toast.error('Update blocked by RLS policy. Check database permissions.');
+      return;
+    }
+    toast.success('User rejected');
+    loadPending();
     load();
   }
 
@@ -328,6 +367,8 @@ export default function SuperAdminCompanies() {
         phone: companyPhone.trim() || null,
         address: companyAddress.trim() || null,
         theme_color: companyThemeColor,
+        login_preference: loginPreference,
+        employee_id_prefix: idPrefix.trim().toUpperCase() || null,
       } as any).select().single();
       if (cErr) throw new Error(cErr.message);
 
@@ -340,7 +381,7 @@ export default function SuperAdminCompanies() {
       // 4. If admin details are provided, create via RPC
       if (ownerEmail.trim() && ownerName.trim() && ownerPassword.length >= 6) {
         try {
-          const { data: fnData, error: fnErr } = await supabase.rpc('create_company_admin', {
+          const { data: fnData, error: fnErr } = await (supabase as any).rpc('create_company_admin', {
             p_company_id: company.id,
             p_email: ownerEmail.trim(),
             p_full_name: ownerName.trim(),
@@ -393,13 +434,15 @@ export default function SuperAdminCompanies() {
         email: editEmail.trim() || null,
         phone: editPhone.trim() || null,
         address: editAddress.trim() || null,
+        login_preference: editLoginPreference,
+        employee_id_prefix: editIdPrefix.trim().toUpperCase() || null,
       } as any).eq('id', editingCompany.id);
       if (error) throw error;
       
       // Handle Owner Info
       if (editOwnerName.trim() && editOwnerEmail.trim() && editOwnerPassword.length >= 6 && !editingCompany.owner_id) {
         // Create new owner
-        const { data: fnData, error: fnErr } = await supabase.rpc('create_company_admin', {
+        const { data: fnData, error: fnErr } = await (supabase as any).rpc('create_company_admin', {
           p_company_id: editingCompany.id,
           p_email: editOwnerEmail.trim(),
           p_full_name: editOwnerName.trim(),
@@ -410,7 +453,7 @@ export default function SuperAdminCompanies() {
         }
       } else if (editingCompany.owner_id && (editOwnerName || editOwnerEmail || editOwnerPassword)) {
         // Update existing owner
-        await supabase.rpc('update_company_admin', {
+        await (supabase as any).rpc('update_company_admin', {
           p_user_id: editingCompany.owner_id,
           p_email: editOwnerEmail.trim() || null,
           p_full_name: editOwnerName.trim() || null,
@@ -557,12 +600,26 @@ export default function SuperAdminCompanies() {
                       </div>
                     </div>
 
-                    {/* Theme Color */}
-                    <div className="space-y-2 pt-2 border-t">
-                      <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground block">Theme Color</Label>
-                      <div className="flex gap-2">
-                        <Input type="color" className="h-9 w-12 p-0 border-none bg-transparent" value={companyThemeColor} onChange={(e) => setCompanyThemeColor(e.target.value)} />
-                        <Input value={companyThemeColor} onChange={(e) => setCompanyThemeColor(e.target.value)} className="font-mono" />
+                    {/* Employee ID Configuration */}
+                    <div className="space-y-3 pt-2 border-t">
+                      <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground block">Employee ID System</Label>
+                      <div className="space-y-1.5">
+                        <Label className="text-xs">ID Prefix (3 letters)</Label>
+                        <Input maxLength={4} placeholder="e.g. TML" value={idPrefix} onChange={(e) => setIdPrefix(e.target.value.toUpperCase())} className="font-mono uppercase w-32" />
+                        <p className="text-[10px] text-muted-foreground">Used for auto-generating IDs like TML-26-001. Defaults to first 3 letters of slug.</p>
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-xs">Login Method</Label>
+                        <Select value={loginPreference} onValueChange={(v: any) => setLoginPreference(v)}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select login method" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="both">Email and Employee ID</SelectItem>
+                            <SelectItem value="email">Email Only</SelectItem>
+                            <SelectItem value="id">Employee ID Only</SelectItem>
+                          </SelectContent>
+                        </Select>
                       </div>
                     </div>
 
@@ -635,7 +692,12 @@ export default function SuperAdminCompanies() {
                     <p className="text-[11px] text-muted-foreground">{u.email} · <span className="text-primary">{u.companies?.name || 'No Company'}</span></p>
                   </div>
                   <div className="flex gap-2">
-                    <Button size="sm" onClick={() => approveUser(u.id)}>Approve</Button>
+                    <Button size="sm" onClick={() => approveUser(u.id)}>
+                      <Check className="h-3 w-3 mr-1" />Approve
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => rejectUser(u.id)}>
+                      <X className="h-3 w-3 mr-1" />Reject
+                    </Button>
                   </div>
                 </div>
               ))}
@@ -723,12 +785,26 @@ export default function SuperAdminCompanies() {
                 </div>
               </div>
 
-              {/* Theme Color */}
-              <div className="space-y-2">
-                <Label>Theme Color</Label>
-                <div className="flex gap-2">
-                  <Input type="color" className="h-9 w-12 p-0 border-none bg-transparent" value={editThemeColor} onChange={(e) => setEditThemeColor(e.target.value)} />
-                  <Input value={editThemeColor} onChange={(e) => setEditThemeColor(e.target.value)} className="font-mono" />
+              {/* Employee ID Configuration */}
+              <div className="space-y-3 pt-2 border-t">
+                <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground block">Employee ID System</Label>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">ID Prefix (3 letters)</Label>
+                  <Input maxLength={4} placeholder="e.g. TML" value={editIdPrefix} onChange={(e) => setEditIdPrefix(e.target.value.toUpperCase())} className="font-mono uppercase w-32" />
+                  <p className="text-[10px] text-muted-foreground">Format: PREFIX-YY-NNN (e.g. TML-26-001)</p>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Login Method</Label>
+                  <Select value={editLoginPreference} onValueChange={(v: any) => setEditLoginPreference(v)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select login method" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="both">Email and Employee ID</SelectItem>
+                      <SelectItem value="email">Email Only</SelectItem>
+                      <SelectItem value="id">Employee ID Only</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
 
@@ -937,9 +1013,11 @@ export default function SuperAdminCompanies() {
                       setEditLogoFile(null);
                       setEditLogoPreview(null);
                       setEditThemeColor((c as any).theme_color || '#0ea5e9');
-                      setEditEmail((c as any).email || '');
-                      setEditPhone((c as any).phone || '');
-                      setEditAddress((c as any).address || '');
+                      setEditEmail(c.email || '');
+                      setEditPhone(c.phone || '');
+                      setEditAddress(c.address || '');
+                      setEditLoginPreference(c.login_preference || 'both');
+                      setEditIdPrefix(c.employee_id_prefix || '');
                       setEditOwnerName(c.owner_name !== 'Not Set' ? (c.owner_name || '') : '');
                       setEditOwnerEmail((c as any).owner_email || '');
                       setEditOwnerPassword('');

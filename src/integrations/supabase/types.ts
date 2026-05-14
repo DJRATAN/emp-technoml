@@ -395,10 +395,16 @@ export type Database = {
       companies: {
         Row: {
           created_at: string
+          email: string | null
+          employee_id_prefix: string | null
           id: string
+          login_preference: string | null
           logo_url: string | null
           name: string
           owner_id: string | null
+          phone: string | null
+          address: string | null
+          plan_type: string
           slug: string
           status: string
           theme_color: string | null
@@ -406,10 +412,16 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          email?: string | null
+          employee_id_prefix?: string | null
           id?: string
+          login_preference?: string | null
           logo_url?: string | null
           name: string
           owner_id?: string | null
+          phone?: string | null
+          address?: string | null
+          plan_type?: string
           slug: string
           status?: string
           theme_color?: string | null
@@ -417,10 +429,16 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          email?: string | null
+          employee_id_prefix?: string | null
           id?: string
+          login_preference?: string | null
           logo_url?: string | null
           name?: string
           owner_id?: string | null
+          phone?: string | null
+          address?: string | null
+          plan_type?: string
           slug?: string
           status?: string
           theme_color?: string | null
@@ -1000,6 +1018,7 @@ export type Database = {
           department: string | null
           email: string
           emergency_contact: string | null
+          employee_internal_id: string | null
           failed_login_count: number
           force_logout_at: string | null
           force_password_change: boolean
@@ -1025,6 +1044,7 @@ export type Database = {
           department?: string | null
           email: string
           emergency_contact?: string | null
+          employee_internal_id?: string | null
           failed_login_count?: number
           force_logout_at?: string | null
           force_password_change?: boolean
@@ -1050,6 +1070,7 @@ export type Database = {
           department?: string | null
           email?: string
           emergency_contact?: string | null
+          employee_internal_id?: string | null
           failed_login_count?: number
           force_logout_at?: string | null
           force_password_change?: boolean

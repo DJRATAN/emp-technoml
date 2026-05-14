@@ -16,6 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 type Profile = {
   id: string; full_name: string; email: string; phone: string | null;
   department: string | null; job_title: string | null; status: 'pending'|'approved'|'rejected'|'suspended';
+  employee_internal_id: string | null;
 };
 
 export default function AdminEmployees() {
@@ -48,7 +49,7 @@ export default function AdminEmployees() {
 
     let query = supabase
       .from('profiles')
-      .select('id, full_name, email, phone, department, job_title, status');
+      .select('id, full_name, email, phone, department, job_title, status, employee_internal_id');
     if (companyId) {
       query = query.eq('company_id', companyId);
     }
@@ -223,24 +224,32 @@ export default function AdminEmployees() {
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead><tr className="text-left text-muted-foreground border-b">
-                  <th className="py-2 pr-4">Name</th><th className="py-2 pr-4">Email</th><th className="py-2 pr-4">Phone</th><th className="py-2 pr-4">Department</th>
-                  <th className="py-2 pr-4">Title</th><th className="py-2 pr-4">Status</th><th className="py-2">Actions</th>
+                  <th className="py-2 pr-4">ID</th><th className="py-2 pr-4">Name</th><th className="py-2 pr-4">Email</th><th className="py-2 pr-4">Department</th>
+                  <th className="py-2 pr-4">Status</th><th className="py-2">Actions</th>
                 </tr></thead>
                 <tbody>
                   {filtered.map((p) => (
                     <tr key={p.id} className="border-b last:border-0">
+                      <td className="py-3 pr-4 font-mono text-[10px] text-muted-foreground">{p.employee_internal_id ?? '—'}</td>
                       <td className="py-3 pr-4 font-medium">{p.full_name}</td>
                       <td className="py-3 pr-4 text-muted-foreground">{p.email}</td>
-                      <td className="py-3 pr-4">{p.phone ?? '—'}</td>
                       <td className="py-3 pr-4">{p.department ?? '—'}</td>
-                      <td className="py-3 pr-4">{p.job_title ?? '—'}</td>
                       <td className="py-3 pr-4"><StatusBadge status={p.status === 'approved' ? 'Active' : p.status === 'pending' ? 'Pending' : p.status === 'suspended' ? 'Suspended' : 'Rejected'} /></td>
                       <td className="py-3">
                         <div className="flex gap-2">
                           <Button size="sm" variant="outline" onClick={() => navigate(`/admin/employees/${p.id}`)}>
                             <Eye className="h-3 w-3 mr-1" />View
                           </Button>
-                          {p.status === 'approved' ? (
+                          {p.status === 'pending' ? (
+                            <div className="flex gap-1">
+                              <Button size="sm" disabled={busyId === p.id} onClick={() => changeStatus(p.id, 'approved')}>
+                                {busyId === p.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <><Check className="h-3 w-3 mr-1" />Approve</>}
+                              </Button>
+                              <Button size="sm" variant="outline" disabled={busyId === p.id} onClick={() => changeStatus(p.id, 'rejected')}>
+                                <X className="h-3 w-3 mr-1" />Reject
+                              </Button>
+                            </div>
+                          ) : p.status === 'approved' ? (
                             <Button size="sm" variant="outline" disabled={busyId === p.id} onClick={() => changeStatus(p.id, 'suspended')}>
                               <UserMinus className="h-3 w-3 mr-1" />Suspend
                             </Button>
