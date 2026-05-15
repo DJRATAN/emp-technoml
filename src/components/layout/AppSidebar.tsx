@@ -47,6 +47,7 @@ export function AppSidebar() {
   const adminMenu = [
     { title: 'Dashboard', url: '/admin', icon: LayoutDashboard, show: true },
     { title: 'Employees', url: '/admin/employees', icon: Users, show: true },
+    { title: 'Settings', url: '/admin/settings', icon: Settings, show: true },
     { title: 'Attendance', url: '/admin/attendance', icon: Clock, show: true },
     { title: 'Live Map', url: '/admin/live-map', icon: MapPin, show: true },
     { title: 'Tasks', url: '/admin/tasks', icon: CheckSquare, show: true },
@@ -62,12 +63,12 @@ export function AppSidebar() {
     { title: 'Approval Chain', url: '/admin/approval-chain', icon: GitBranch, show: true },
     { title: 'Reports', url: '/admin/reports', icon: FileBarChart, show: true },
     { title: 'Features', url: '/admin/features', icon: ToggleLeft, show: true },
-    { title: 'Settings', url: '/admin/settings', icon: Settings, show: true },
   ].filter(i => i.show);
 
   const superAdminMenu = [
     { title: 'Dashboard', url: '/super-admin', icon: LayoutDashboard },
     { title: 'Companies', url: '/super-admin/companies', icon: Globe },
+    { title: 'Settings', url: '/admin/settings', icon: Settings },
     { title: 'My Company', url: '/admin', icon: Building2 },
   ];
 

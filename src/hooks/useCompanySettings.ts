@@ -18,7 +18,11 @@ export interface CompanySettings {
   face_recognition_sensitivity: number;
   logo_url?: string | null;
   theme_color?: string | null;
+  address?: string | null;
+  email?: string | null;
+  phone?: string | null;
 }
+
 
 export function useCompanySettings() {
   const { user } = useAuth();
@@ -28,10 +32,10 @@ export function useCompanySettings() {
   const fetchSettings = useCallback(async () => {
     if (!user?.companyId) { setLoading(false); return; }
     
-    // Fetch both settings and company branding
+    // Fetch both settings and company branding (including name, email, phone, address)
     const [settingsRes, companyRes] = await Promise.all([
       supabase.from('company_settings').select('*').eq('company_id', user.companyId).maybeSingle(),
-      supabase.from('companies').select('logo_url, theme_color' as any).eq('id', user.companyId).maybeSingle()
+      supabase.from('companies').select('name, logo_url, theme_color, address, email, phone' as any).eq('id', user.companyId).maybeSingle()
     ]);
 
     if (settingsRes.data) {
@@ -41,24 +45,31 @@ export function useCompanySettings() {
         office_longitude: Number(settingsRes.data.office_longitude),
         logo_url: (companyRes.data as any)?.logo_url,
         theme_color: (companyRes.data as any)?.theme_color,
+        address: (companyRes.data as any)?.address,
+        email: (companyRes.data as any)?.email,
+        phone: (companyRes.data as any)?.phone,
       } as CompanySettings);
     } else {
+      // Fallback: use data from company table if settings row is missing
       setSettings({
         company_id: user?.companyId ?? '',
-        company_name: '',
+        company_name: (companyRes.data as any)?.name || '',
         office_latitude: 0,
         office_longitude: 0,
-        geofence_radius_m: 0,
-        work_start_time: '',
-        work_end_time: '',
-        late_threshold_minutes: 0,
-        annual_leave_quota: 0,
-        sick_leave_quota: 0,
-        casual_leave_quota: 0,
+        geofence_radius_m: 200,
+        work_start_time: '09:00',
+        work_end_time: '18:00',
+        late_threshold_minutes: 15,
+        annual_leave_quota: 21,
+        sick_leave_quota: 10,
+        casual_leave_quota: 7,
         leave_approval_sla_hours: 48,
-        face_recognition_sensitivity: 0.5,
-        logo_url: null,
-        theme_color: null,
+        face_recognition_sensitivity: 50,
+        logo_url: (companyRes.data as any)?.logo_url || null,
+        theme_color: (companyRes.data as any)?.theme_color || null,
+        address: (companyRes.data as any)?.address || null,
+        email: (companyRes.data as any)?.email || null,
+        phone: (companyRes.data as any)?.phone || null,
       } as CompanySettings);
     }
     setLoading(false);

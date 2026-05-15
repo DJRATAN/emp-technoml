@@ -1,4 +1,0 @@
-{
-  "action": "run_sql",
-  "sql": "DO $$ DECLARE uid uuid; BEGIN SELECT id INTO uid FROM auth.users WHERE email = 'ratanprajapati1242@gmail.com'; IF uid IS NOT NULL THEN UPDATE public.profiles SET status = 'approved', is_active = true WHERE id = uid; INSERT INTO public.user_roles (user_id, role) VALUES (uid, 'super_admin') ON CONFLICT DO NOTHING; END IF; END $$;"
-}
