@@ -199,7 +199,7 @@ export default function AdminEmployeeDetail() {
   async function save() {
     if (!id) return;
     setSaving(true);
-    const { error } = await supabase.from('profiles').update({
+    const { data, error } = await supabase.from('profiles').update({
       full_name: form.full_name.trim(),
       phone: form.phone?.trim() || null,
       department: form.department?.trim() || null,
@@ -208,11 +208,30 @@ export default function AdminEmployeeDetail() {
       address: form.address?.trim() || null,
       date_of_birth: form.date_of_birth || null,
       employee_internal_id: form.employee_internal_id?.trim() || null,
-    } as any).eq('id', id);
+    } as any).eq('id', id).select();
+    
     setSaving(false);
     if (error) return toast.error(error.message);
+    if (!data || data.length === 0) return toast.error('Update failed: Profile not found or access denied');
+    
     if (form.employee_internal_id) setIsIdPermanent(true);
     toast.success('Profile updated');
+    loadDocs(); // Refresh docs
+  }
+
+  async function saveEmployeeId() {
+    if (!id) return;
+    setSaving(true);
+    const { data, error } = await supabase.from('profiles').update({
+      employee_internal_id: form.employee_internal_id?.trim() || null,
+    } as any).eq('id', id).select();
+    
+    setSaving(false);
+    if (error) return toast.error(error.message);
+    if (!data || data.length === 0) return toast.error('Update failed: Profile not found or access denied');
+    
+    if (form.employee_internal_id) setIsIdPermanent(true);
+    toast.success('Employee ID assigned successfully');
   }
 
   async function toggleActive() {
@@ -808,6 +827,15 @@ export default function AdminEmployeeDetail() {
                   disabled={isIdPermanent}
                   onClick={async () => {
                     if (!user?.companyId) return toast.error('Company not found');
+                    
+                    // First check if company has a prefix
+                    const { data: comp } = await supabase.from('companies').select('employee_id_prefix').eq('id', user.companyId).single() as any;
+                    if (!comp?.employee_id_prefix) {
+                      toast.error('Please set an Employee ID Prefix in Settings first');
+                      navigate('/admin/settings');
+                      return;
+                    }
+
                     const { data, error } = await (supabase as any).rpc('get_next_employee_id', { p_company_id: user.companyId });
                     if (error) { toast.error('Auto-generate failed: ' + error.message); return; }
                     if (data) { update('employee_internal_id', data); toast.success(`Suggested ID: ${data}`); }
@@ -815,8 +843,21 @@ export default function AdminEmployeeDetail() {
                 >
                   ⚡ Auto-Generate
                 </Button>
+                {form.employee_internal_id && !isIdPermanent && (
+                  <Button size="sm" onClick={saveEmployeeId} disabled={saving}>
+                    {saving ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Assign ID'}
+                  </Button>
+                )}
+                {isIdPermanent && (user?.role === 'admin' || user?.role === 'super_admin' || user?.isOwner) && (
+                  <Button variant="ghost" size="sm" onClick={() => setIsIdPermanent(false)} className="text-[10px] h-8 text-muted-foreground hover:text-primary">
+                    <Lock className="h-3 w-3 mr-1" /> Unlock
+                  </Button>
+                )}
               </div>
-              <p className="text-[10px] text-muted-foreground">Format: PREFIX-YY-NNN (case-insensitive for login). Click Auto-Generate to get the next available ID.</p>
+              <p className="text-[10px] text-muted-foreground mt-1 flex items-center gap-1">
+                <AlertTriangle className="h-3 w-3 text-warning" /> 
+                {isIdPermanent ? 'ID is locked. Use the unlock button to change if necessary.' : 'Format: PREFIX-YY-NNN. Click Assign ID to save.'}
+              </p>
             </div>
             <div className="space-y-2">
               <Label className="flex items-center gap-1"><Mail className="h-3 w-3" /> Email</Label>

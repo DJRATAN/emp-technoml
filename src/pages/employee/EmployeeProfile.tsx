@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -30,35 +30,40 @@ export default function EmployeeProfile() {
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [docs, setDocs] = useState<Doc[]>([]);
 
-  useEffect(() => {
+  const fetchProfile = useCallback(async () => {
     if (!user) return;
-    (async () => {
-      const { data } = await supabase
-        .from('profiles')
-        .select('full_name, phone, department, job_title, emergency_contact, address, date_of_birth, id_card_url, avatar_url, employee_internal_id')
-        .eq('id', user.id)
-        .maybeSingle();
-      if (data) {
-        setProfile(data as ProfileData);
-        if (data.id_card_url) {
-          const { data: signed } = await supabase.storage.from('id-cards').createSignedUrl(data.id_card_url, 3600);
-          setIdCardPreview(signed?.signedUrl ?? null);
-        }
-        if (data.avatar_url) {
-          const { data: signed } = await supabase.storage.from('avatars').createSignedUrl(data.avatar_url, 3600);
-          setAvatarPreview(signed?.signedUrl ?? null);
-        }
+    setLoading(true);
+    const { data } = await supabase
+      .from('profiles')
+      .select('full_name, phone, department, job_title, emergency_contact, address, date_of_birth, id_card_url, avatar_url, employee_internal_id')
+      .eq('id', user.id)
+      .maybeSingle();
+    
+    if (data) {
+      setProfile(data as ProfileData);
+      if (data.id_card_url) {
+        const { data: signed } = await supabase.storage.from('id-cards').createSignedUrl(data.id_card_url, 3600);
+        setIdCardPreview(signed?.signedUrl ?? null);
       }
-      // Load documents
-      const { data: docData } = await supabase
-        .from('employee_documents' as any)
-        .select('id, document_type, file_name, storage_path, created_at')
-        .eq('employee_id', user.id)
-        .order('created_at', { ascending: false });
-      setDocs((docData as any) ?? []);
-      setLoading(false);
-    })();
+      if (data.avatar_url) {
+        const { data: signed } = await supabase.storage.from('avatars').createSignedUrl(data.avatar_url, 3600);
+        setAvatarPreview(signed?.signedUrl ?? null);
+      }
+    }
+    
+    // Load documents
+    const { data: docData } = await supabase
+      .from('employee_documents' as any)
+      .select('id, document_type, file_name, storage_path, created_at')
+      .eq('employee_id', user.id)
+      .order('created_at', { ascending: false });
+    setDocs((docData as any) ?? []);
+    setLoading(false);
   }, [user]);
+
+  useEffect(() => {
+    fetchProfile();
+  }, [fetchProfile]);
 
   async function downloadDoc(doc: Doc) {
     const { data } = await supabase.storage.from('employee-documents').createSignedUrl(doc.storage_path, 300);
@@ -95,7 +100,13 @@ export default function EmployeeProfile() {
             <h1 className="text-2xl font-heading font-bold">My Profile</h1>
             <p className="text-muted-foreground">Your profile is managed by your company admin</p>
           </div>
-          <ChangePasswordDialog />
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={fetchProfile} disabled={loading}>
+              <Loader2 className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+              Refresh
+            </Button>
+            <ChangePasswordDialog />
+          </div>
         </div>
 
         <Card className="p-6">

@@ -31,6 +31,7 @@ const DEFAULT_SETTINGS = {
   leave_approval_sla_hours: 48,
   face_recognition_sensitivity: 50,
   theme_color: '#0ea5e9',
+  employee_id_prefix: '',
 };
 
 interface CompanyOption {
@@ -97,6 +98,7 @@ export default function AdminSettings() {
           address: (companyRes.data as any)?.address,
           email: (companyRes.data as any)?.email,
           phone: (companyRes.data as any)?.phone,
+          employee_id_prefix: (companyRes.data as any)?.employee_id_prefix,
         });
       } else {
         // Provide defaults if no row exists
@@ -109,6 +111,7 @@ export default function AdminSettings() {
           address: (companyRes.data as any)?.address || '',
           email: (companyRes.data as any)?.email || '',
           phone: (companyRes.data as any)?.phone || '',
+          employee_id_prefix: (companyRes.data as any)?.employee_id_prefix || '',
           face_recognition_sensitivity: Number(settingsRes.data?.face_recognition_sensitivity ?? DEFAULT_SETTINGS.face_recognition_sensitivity),
         });
       }
@@ -194,6 +197,7 @@ export default function AdminSettings() {
         address: form.address,
         email: form.email,
         phone: form.phone,
+        employee_id_prefix: form.employee_id_prefix?.trim()?.toUpperCase() || null,
       } as any).eq('id', companyId);
       if (compErr) throw compErr;
 
@@ -411,6 +415,11 @@ export default function AdminSettings() {
             <div className="space-y-2">
               <Label>Business Email</Label>
               <Input type="email" value={form.email || ''} onChange={(e) => update('email', e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label>Employee ID Prefix</Label>
+              <Input value={form.employee_id_prefix || ''} onChange={(e) => update('employee_id_prefix', e.target.value.toUpperCase())} placeholder="e.g. TML, EMP, TECH" />
+              <p className="text-[10px] text-muted-foreground">Used for auto-generating employee IDs (e.g. TML-24-001)</p>
             </div>
             <div className="space-y-2">
               <Label>Phone Number</Label>

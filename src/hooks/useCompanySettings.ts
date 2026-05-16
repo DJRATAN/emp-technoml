@@ -21,6 +21,7 @@ export interface CompanySettings {
   address?: string | null;
   email?: string | null;
   phone?: string | null;
+  employee_id_prefix?: string | null;
 }
 
 
@@ -32,10 +33,10 @@ export function useCompanySettings() {
   const fetchSettings = useCallback(async () => {
     if (!user?.companyId) { setLoading(false); return; }
     
-    // Fetch both settings and company branding (including name, email, phone, address)
+    // Fetch both settings and company branding (including name, email, phone, address, and prefix)
     const [settingsRes, companyRes] = await Promise.all([
       supabase.from('company_settings').select('*').eq('company_id', user.companyId).maybeSingle(),
-      supabase.from('companies').select('name, logo_url, theme_color, address, email, phone' as any).eq('id', user.companyId).maybeSingle()
+      supabase.from('companies').select('name, logo_url, theme_color, address, email, phone, employee_id_prefix' as any).eq('id', user.companyId).maybeSingle()
     ]);
 
     if (settingsRes.data) {
@@ -48,6 +49,7 @@ export function useCompanySettings() {
         address: (companyRes.data as any)?.address,
         email: (companyRes.data as any)?.email,
         phone: (companyRes.data as any)?.phone,
+        employee_id_prefix: (companyRes.data as any)?.employee_id_prefix,
       } as CompanySettings);
     } else {
       // Fallback: use data from company table if settings row is missing
@@ -70,6 +72,7 @@ export function useCompanySettings() {
         address: (companyRes.data as any)?.address || null,
         email: (companyRes.data as any)?.email || null,
         phone: (companyRes.data as any)?.phone || null,
+        employee_id_prefix: (companyRes.data as any)?.employee_id_prefix || null,
       } as CompanySettings);
     }
     setLoading(false);
