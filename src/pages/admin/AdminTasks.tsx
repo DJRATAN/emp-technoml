@@ -260,14 +260,14 @@ export default function AdminTasks() {
     }));
     setTasks(tasksData as Task[]);
 
-    let allProfiles = ((p.data as Emp[]) ?? []).filter(prof => prof.id !== user?.id);
-    if (user && !user.isOwner && user.role === 'admin') {
-      allProfiles = allProfiles.filter(emp => roleMap.get(emp.id) === 'employee');
-    }
+    // Show all company members except current user and super admins
+    const superAdminIds = new Set((r.data ?? []).filter((ur: any) => ur.role === 'super_admin').map((ur: any) => ur.user_id));
+    const allProfiles = ((p.data as Emp[]) ?? []).filter(prof => prof.id !== user?.id && !superAdminIds.has(prof.id));
     
     setEmployees(allProfiles);
     setLoading(false);
   }, [user]);
+
 
   useEffect(() => { load(); }, [load]);
 

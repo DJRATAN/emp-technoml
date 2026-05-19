@@ -37,9 +37,9 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | null>(null);
 
 async function loadAppUser(sbUser: SbUser): Promise<AppUser | null> {
-  // 1. Load basic profile and roles
+  // 1. Fetch profile WITHOUT a join — avoid RLS failures on related tables
   const [{ data: profile, error: profErr }, { data: roles }] = await Promise.all([
-    supabase.from('profiles').select('*, companies:company_id(id, name, slug, owner_id)').eq('id', sbUser.id).maybeSingle(),
+    supabase.from('profiles').select('*').eq('id', sbUser.id).maybeSingle(),
     supabase.from('user_roles').select('role').eq('user_id', sbUser.id),
   ]);
 
@@ -62,37 +62,34 @@ async function loadAppUser(sbUser: SbUser): Promise<AppUser | null> {
         company: null,
       };
     }
+    console.error('Profile not found for user:', sbUser.id, 'profErr:', profErr);
     return null;
   }
 
-  // 2. Safely attempt to load branding (in case migrations haven't run)
-  const companyRaw = (profile as any).companies as any;
-  let branding: { logoUrl?: string | null; themeColor?: string | null } = {};
-  
-  if (companyRaw?.id) {
-    const { data: bData } = await supabase
+  // 2. Fetch company separately (decoupled from profiles join to avoid RLS issues)
+  let company: AppCompany | null = null;
+  let isOwner = false;
+
+  if (profile.company_id) {
+    const { data: companyData } = await supabase
       .from('companies')
-      .select('logo_url, theme_color, plan_type' as any)
-      .eq('id', companyRaw.id)
+      .select('id, name, slug, owner_id, logo_url, theme_color, plan_type' as any)
+      .eq('id', profile.company_id)
       .maybeSingle();
-    if (bData) branding = { 
-      logoUrl: (bData as any).logo_url, 
-      themeColor: (bData as any).theme_color,
-      planType: (bData as any).plan_type || 'basic'
-    };
+
+    if (companyData) {
+      isOwner = (companyData as any).owner_id === sbUser.id;
+      company = {
+        id: (companyData as any).id,
+        name: (companyData as any).name,
+        slug: (companyData as any).slug,
+        planType: (companyData as any).plan_type || 'basic',
+        logoUrl: (companyData as any).logo_url,
+        themeColor: (companyData as any).theme_color,
+      };
+    }
   }
 
-  const company: AppCompany | null = companyRaw ? { 
-    id: companyRaw.id, 
-    name: companyRaw.name, 
-    slug: companyRaw.slug,
-    planType: (branding as any).planType || 'basic',
-    logoUrl: branding.logoUrl,
-    themeColor: branding.themeColor
-  } : null;
-  
-  const isOwner = companyRaw?.owner_id === sbUser.id;
-  
   return {
     id: sbUser.id,
     email: profile.email,

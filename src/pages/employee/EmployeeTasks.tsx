@@ -27,7 +27,7 @@ export default function EmployeeTasks() {
   const { user } = useAuth();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
-  const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [updatingAction, setUpdatingAction] = useState<{id: string, action: string} | null>(null);
 
   const load = useCallback(async () => {
     if (!user) return;
@@ -66,12 +66,13 @@ export default function EmployeeTasks() {
   useEffect(() => { load(); }, [load]);
 
   async function setStatus(id: string, status: Task['status']) {
-    setUpdatingId(id);
+    setUpdatingAction({ id, action: status === 'in_progress' ? 'start' : 'complete' });
     const update: any = { status };
     if (status === 'completed') update.completed_at = new Date().toISOString();
-    const { error } = await supabase.from('tasks').update(update).eq('id', id);
-    setUpdatingId(null);
+    const { data, error } = await supabase.from('tasks').update(update).eq('id', id).select();
+    setUpdatingAction(null);
     if (error) return toast.error(error.message);
+    if (!data || data.length === 0) return toast.error('Update failed. Access denied or task not found.');
     toast.success(`Task marked ${status.replace('_', ' ')}`);
     load();
   }
@@ -84,15 +85,16 @@ export default function EmployeeTasks() {
   function filter(status?: string) { return status ? tasks.filter((t) => t.status === status) : tasks; }
 
   async function saveProgress(t: Task, value: number) {
-    setUpdatingId(t.id);
+    setUpdatingAction({ id: t.id, action: 'progress' });
     const total = t.target_count ?? 0;
     const v = Math.max(0, Math.min(total || value, value));
     const update: any = { progress_count: v };
     if (total && v >= total) { update.status = 'completed'; update.completed_at = new Date().toISOString(); }
     else if (v > 0) { update.status = 'in_progress'; }
-    const { error } = await supabase.from('tasks').update(update).eq('id', t.id);
-    setUpdatingId(null);
+    const { data, error } = await supabase.from('tasks').update(update).eq('id', t.id).select();
+    setUpdatingAction(null);
     if (error) return toast.error(error.message);
+    if (!data || data.length === 0) return toast.error('Update failed. Access denied or task not found.');
     toast.success('Progress updated'); load();
   }
 
@@ -111,7 +113,7 @@ export default function EmployeeTasks() {
               <Target className="h-4 w-4 text-primary" />
               <h4 className="font-semibold">{t.title}</h4>
               <Badge variant="secondary">{monthLabel}</Badge>
-              <StatusBadge status={t.status === 'in_progress' ? 'In Progress' : t.status === 'completed' ? 'Completed' : 'Pending'} />
+              <StatusBadge status={t.status === 'in_progress' ? 'Ongoing' : t.status === 'completed' ? 'Finished' : 'Not Started'} />
             </div>
             <p className="text-xs text-muted-foreground mt-1">{t.progress_count}/{total} completed</p>
           </div>
@@ -120,9 +122,9 @@ export default function EmployeeTasks() {
         <div className="flex items-end gap-2">
           <Input type="number" min={0} max={total || undefined} value={draft}
             onChange={(e) => setDraft(e.target.value)} className="w-28 h-9" />
-          <Button size="sm" disabled={updatingId === t.id || Number(draft) === t.progress_count}
+          <Button size="sm" disabled={updatingAction?.id === t.id || Number(draft) === t.progress_count}
             onClick={() => saveProgress(t, Number(draft))}>
-            {updatingId === t.id ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Update'}
+            {updatingAction?.id === t.id && updatingAction.action === 'progress' ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Update'}
           </Button>
         </div>
       </Card>
@@ -147,15 +149,17 @@ export default function EmployeeTasks() {
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div className="flex items-center gap-3 text-xs text-muted-foreground">
             {t.due_date && <span className="inline-flex items-center gap-1"><Calendar className="h-3 w-3" />Due {t.due_date}</span>}
-            <StatusBadge status={t.status === 'in_progress' ? 'In Progress' : t.status === 'completed' ? 'Completed' : 'Pending'} />
+            <StatusBadge status={t.status === 'in_progress' ? 'Ongoing' : t.status === 'completed' ? 'Finished' : 'Not Started'} />
           </div>
           <div className="flex gap-2">
             {t.status !== 'in_progress' && t.status !== 'completed' && (
-              <Button size="sm" variant="outline" disabled={updatingId === t.id || (t.parent_task && t.parent_task.status !== 'completed')} onClick={() => setStatus(t.id, 'in_progress')}>Start</Button>
+              <Button size="sm" variant="outline" disabled={updatingAction?.id === t.id || (t.parent_task && t.parent_task.status !== 'completed')} onClick={() => setStatus(t.id, 'in_progress')}>
+                {updatingAction?.id === t.id && updatingAction.action === 'start' ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null} Start
+              </Button>
             )}
             {t.status !== 'completed' && (
-              <Button size="sm" disabled={updatingId === t.id || (t.parent_task && t.parent_task.status !== 'completed')} onClick={() => setStatus(t.id, 'completed')}>
-                {updatingId === t.id ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Complete'}
+              <Button size="sm" disabled={updatingAction?.id === t.id || (t.parent_task && t.parent_task.status !== 'completed')} onClick={() => setStatus(t.id, 'completed')}>
+                {updatingAction?.id === t.id && updatingAction.action === 'complete' ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null} Finish
               </Button>
             )}
           </div>
@@ -180,9 +184,9 @@ export default function EmployeeTasks() {
         <Tabs defaultValue="all">
           <TabsList>
             <TabsTrigger value="all">All ({counts.all})</TabsTrigger>
-            <TabsTrigger value="pending">Pending ({counts.pending})</TabsTrigger>
-            <TabsTrigger value="in_progress">In Progress ({counts.in_progress})</TabsTrigger>
-            <TabsTrigger value="completed">Completed ({counts.completed})</TabsTrigger>
+            <TabsTrigger value="pending">Not Started ({counts.pending})</TabsTrigger>
+            <TabsTrigger value="in_progress">Ongoing ({counts.in_progress})</TabsTrigger>
+            <TabsTrigger value="completed">Finished ({counts.completed})</TabsTrigger>
           </TabsList>
           <TabsContent value="all" className="mt-4"><List items={filter()} /></TabsContent>
           <TabsContent value="pending" className="mt-4"><List items={filter('pending')} /></TabsContent>
