@@ -47,26 +47,49 @@ interface CompanyRow {
 }
 
 const ALL_FEATURES = [
-  { key: 'chat_enabled', label: 'Team Chat', description: 'Enable realtime chat between employees' },
-  { key: 'tasks_enabled', label: 'Tasks Management', description: 'Assign and track tasks' },
-  { key: 'kudos_enabled', label: 'Kudos Wall', description: 'Employee recognition platform' },
-  { key: 'birthdays_enabled', label: 'Birthdays & Events', description: 'Celebrate team milestones' },
-  { key: 'helpdesk_enabled', label: 'IT Helpdesk', description: 'Ticketing system for internal support' },
-  { key: 'ai_analytics_enabled', label: 'AI Analytics', description: 'Smart insights and predictions' },
-  { key: 'payroll_export_enabled', label: 'Payroll Export', description: 'Export attendance to payroll formats' },
-  { key: 'multi_level_approvals_enabled', label: 'Multi-Level Approvals', description: 'Advanced approval workflows' },
-  { key: 'ip_whitelist_enabled', label: 'IP Whitelisting', description: 'Restrict access by IP address' },
-  { key: 'mock_gps_detection_enabled', label: 'Mock GPS Detection', description: 'Prevent fake location check-ins' },
+  // Basic tier
+  { key: 'tasks_enabled', label: 'Tasks Management', description: 'Assign and track tasks', plan: 'basic' as const, icon: '📋' },
+  { key: 'birthdays_enabled', label: 'Birthdays & Events', description: 'Celebrate team milestones', plan: 'basic' as const, icon: '🎂' },
+  // Pro tier
+  { key: 'chat_enabled', label: 'Team Chat', description: 'Enable realtime chat between employees', plan: 'pro' as const, icon: '💬' },
+  { key: 'kudos_enabled', label: 'Kudos Wall', description: 'Employee recognition platform', plan: 'pro' as const, icon: '🏆' },
+  { key: 'helpdesk_enabled', label: 'IT Helpdesk', description: 'Ticketing system for internal support', plan: 'pro' as const, icon: '🎫' },
+  { key: 'multi_level_approvals_enabled', label: 'Multi-Level Approvals', description: 'Advanced approval workflows', plan: 'pro' as const, icon: '✅' },
+  // Enterprise tier
+  { key: 'ai_analytics_enabled', label: 'AI Analytics', description: 'Smart insights and predictions', plan: 'enterprise' as const, icon: '🤖' },
+  { key: 'payroll_export_enabled', label: 'Payroll Export', description: 'Export attendance to payroll formats', plan: 'enterprise' as const, icon: '💰' },
+  { key: 'ip_whitelist_enabled', label: 'IP Whitelisting', description: 'Restrict access by IP address', plan: 'enterprise' as const, icon: '🔒' },
+  { key: 'mock_gps_detection_enabled', label: 'Mock GPS Detection', description: 'Prevent fake location check-ins', plan: 'enterprise' as const, icon: '📍' },
+  { key: 'wellbeing_enabled', label: 'Employee Wellbeing', description: 'Mental health & wellness tracking', plan: 'enterprise' as const, icon: '❤️' },
 ];
 
 const PLAN_DEFAULTS: Record<string, string[]> = {
   basic: ['tasks_enabled', 'birthdays_enabled'],
-  pro: ['tasks_enabled', 'birthdays_enabled', 'chat_enabled', 'kudos_enabled', 'helpdesk_enabled'],
+  pro: ['tasks_enabled', 'birthdays_enabled', 'chat_enabled', 'kudos_enabled', 'helpdesk_enabled', 'multi_level_approvals_enabled'],
   enterprise: [
-    'tasks_enabled', 'birthdays_enabled', 'chat_enabled', 'kudos_enabled', 
-    'helpdesk_enabled', 'ai_analytics_enabled', 'payroll_export_enabled', 
-    'multi_level_approvals_enabled', 'ip_whitelist_enabled', 'mock_gps_detection_enabled'
+    'tasks_enabled', 'birthdays_enabled', 'chat_enabled', 'kudos_enabled',
+    'helpdesk_enabled', 'multi_level_approvals_enabled', 'ai_analytics_enabled',
+    'payroll_export_enabled', 'ip_whitelist_enabled', 'mock_gps_detection_enabled',
+    'wellbeing_enabled'
   ]
+};
+
+const PLAN_COLORS = {
+  basic: 'text-slate-600 bg-slate-100 border-slate-200',
+  pro: 'text-blue-600 bg-blue-100 border-blue-200',
+  enterprise: 'text-purple-600 bg-purple-100 border-purple-200',
+};
+
+const PLAN_CARD_COLORS = {
+  basic: 'border-slate-200 bg-gradient-to-br from-slate-50 to-white hover:border-slate-400',
+  pro: 'border-blue-200 bg-gradient-to-br from-blue-50 to-white hover:border-blue-400',
+  enterprise: 'border-purple-200 bg-gradient-to-br from-purple-50 to-white hover:border-purple-400',
+};
+
+const PLAN_ACTIVE_COLORS = {
+  basic: 'border-slate-500 bg-gradient-to-br from-slate-100 to-slate-50 ring-2 ring-slate-300',
+  pro: 'border-blue-500 bg-gradient-to-br from-blue-100 to-blue-50 ring-2 ring-blue-300',
+  enterprise: 'border-purple-500 bg-gradient-to-br from-purple-100 to-purple-50 ring-2 ring-purple-300',
 };
 
 export default function SuperAdminCompanies() {
@@ -90,6 +113,7 @@ export default function SuperAdminCompanies() {
   const [companyThemeColor, setCompanyThemeColor] = useState('#0ea5e9');
   const [loginPreference, setLoginPreference] = useState<'email' | 'id' | 'both'>('both');
   const [idPrefix, setIdPrefix] = useState('');
+  const [planType, setPlanType] = useState<'basic' | 'pro' | 'enterprise'>('basic');
 
   const [editOpen, setEditOpen] = useState(false);
   const [editingCompany, setEditingCompany] = useState<CompanyRow | null>(null);
@@ -103,6 +127,7 @@ export default function SuperAdminCompanies() {
   const [editAddress, setEditAddress] = useState('');
   const [editLoginPreference, setEditLoginPreference] = useState<'email' | 'id' | 'both'>('both');
   const [editIdPrefix, setEditIdPrefix] = useState('');
+  const [editPlanType, setEditPlanType] = useState<'basic' | 'pro' | 'enterprise'>('basic');
   
   const [editOwnerName, setEditOwnerName] = useState('');
   const [editOwnerEmail, setEditOwnerEmail] = useState('');
@@ -319,19 +344,38 @@ export default function SuperAdminCompanies() {
   const saveAllFeatures = async () => {
     if (!configuringCompany) return;
     setSavingFeatures(true);
-    const { error } = await supabase.from('company_features' as any).upsert({
-      company_id: configuringCompany.id,
-      ...currentFeatures
-    });
-    
-    // Also update plan type
-    await supabase.from('companies').update({ plan_type: configuringCompany.plan_type }).eq('id', configuringCompany.id);
-    
-    setSavingFeatures(false);
-    if (error) return toast.error(error.message);
-    toast.success('Features updated');
-    setFeaturesOpen(false);
-    load();
+    try {
+      // Use select-then-insert/update to avoid ON CONFLICT issues (id may be NULL)
+      const { data: existing } = await supabase
+        .from('company_features' as any).select('company_id')
+        .eq('company_id', configuringCompany.id).maybeSingle();
+
+      let featErr;
+      if (existing) {
+        const r = await supabase.from('company_features' as any)
+          .update({ ...currentFeatures })
+          .eq('company_id', configuringCompany.id);
+        featErr = r.error;
+      } else {
+        const r = await supabase.from('company_features' as any)
+          .insert({ company_id: configuringCompany.id, ...currentFeatures });
+        featErr = r.error;
+      }
+      if (featErr) throw new Error(featErr.message);
+
+      // Also update plan type on the company record
+      await supabase.from('companies')
+        .update({ plan_type: configuringCompany.plan_type })
+        .eq('id', configuringCompany.id);
+
+      toast.success(`✅ Features saved for ${configuringCompany.name}`);
+      setFeaturesOpen(false);
+      load();
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setSavingFeatures(false);
+    }
   };
 
   useEffect(() => { load(); }, [load]);
@@ -369,6 +413,7 @@ export default function SuperAdminCompanies() {
         theme_color: companyThemeColor,
         login_preference: loginPreference,
         employee_id_prefix: idPrefix.trim().toUpperCase() || null,
+        plan_type: planType,
       } as any).select().single();
       if (cErr) throw new Error(cErr.message);
 
@@ -377,6 +422,15 @@ export default function SuperAdminCompanies() {
         company_id: company.id,
         company_name: name.trim(),
       } as any);
+
+      // Create company features based on plan defaults
+      const defaults = PLAN_DEFAULTS[planType] || [];
+      const newFeatures: any = { company_id: company.id };
+      ALL_FEATURES.forEach(f => {
+        newFeatures[f.key] = defaults.includes(f.key);
+      });
+      const { error: featErr } = await supabase.from('company_features' as any).insert(newFeatures);
+      if (featErr) console.error('Error inserting default company features:', featErr.message);
 
       // 4. If admin details are provided, create via RPC
       if (ownerEmail.trim() && ownerName.trim() && ownerPassword.length >= 6) {
@@ -399,6 +453,7 @@ export default function SuperAdminCompanies() {
       setName(''); setSlug(''); setOwnerEmail(''); setOwnerName(''); setOwnerPassword('');
       setLogoFile(null); setLogoPreview(null);
       setCompanyEmail(''); setCompanyPhone(''); setCompanyAddress(''); setCompanyThemeColor('#0ea5e9');
+      setPlanType('basic');
       setOpen(false);
       load();
     } catch (err: any) {
@@ -436,8 +491,31 @@ export default function SuperAdminCompanies() {
         address: editAddress.trim() || null,
         login_preference: editLoginPreference,
         employee_id_prefix: editIdPrefix.trim().toUpperCase() || null,
+        plan_type: editPlanType,
       } as any).eq('id', editingCompany.id);
       if (error) throw error;
+
+      // If plan type changed, update the defaults in company_features
+      if (editPlanType !== editingCompany.plan_type) {
+        const { data: existing } = await supabase
+          .from('company_features' as any).select('company_id')
+          .eq('company_id', editingCompany.id).maybeSingle();
+
+        const defaults = PLAN_DEFAULTS[editPlanType] || [];
+        const newFeatures: any = {};
+        ALL_FEATURES.forEach(f => {
+          newFeatures[f.key] = defaults.includes(f.key);
+        });
+
+        if (existing) {
+          await supabase.from('company_features' as any)
+            .update(newFeatures)
+            .eq('company_id', editingCompany.id);
+        } else {
+          await supabase.from('company_features' as any)
+            .insert({ company_id: editingCompany.id, ...newFeatures });
+        }
+      }
       
       // Handle Owner Info
       if (editOwnerName.trim() && editOwnerEmail.trim() && editOwnerPassword.length >= 6 && !editingCompany.owner_id) {
@@ -618,6 +696,23 @@ export default function SuperAdminCompanies() {
                             <SelectItem value="both">Email and Employee ID</SelectItem>
                             <SelectItem value="email">Email Only</SelectItem>
                             <SelectItem value="id">Employee ID Only</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    {/* Subscription Plan Configuration */}
+                    <div className="space-y-3 pt-2 border-t">
+                      <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground block">Subscription Plan</Label>
+                      <div className="space-y-1.5">
+                        <Label className="text-xs">Subscription Tier</Label>
+                        <Select value={planType} onValueChange={(v: any) => setPlanType(v)}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select plan type" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="basic">Basic Plan (Core features)</SelectItem>
+                            <SelectItem value="pro">Pro Plan (Adds Chat, Kudos, Helpdesk, Approvals)</SelectItem>
+                            <SelectItem value="enterprise">Enterprise Plan (All features unlocked)</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
@@ -808,6 +903,24 @@ export default function SuperAdminCompanies() {
                 </div>
               </div>
 
+              {/* Subscription Plan Configuration */}
+              <div className="space-y-3 pt-2 border-t">
+                <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground block">Subscription Plan</Label>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Subscription Tier</Label>
+                  <Select value={editPlanType} onValueChange={(v: any) => setEditPlanType(v)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select plan type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="basic">Basic Plan (Core features)</SelectItem>
+                      <SelectItem value="pro">Pro Plan (Adds Chat, Kudos, Helpdesk, Approvals)</SelectItem>
+                      <SelectItem value="enterprise">Enterprise Plan (All features unlocked)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
               <Button type="submit" className="w-full" disabled={submitting}>
                 {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Save Changes'}
               </Button>
@@ -896,59 +1009,118 @@ export default function SuperAdminCompanies() {
 
         {/* Features Management Dialog */}
         <Dialog open={featuresOpen} onOpenChange={setFeaturesOpen}>
-          <DialogContent className="max-w-2xl">
+          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
+              <DialogTitle className="flex items-center gap-2 text-xl">
                 <Shield className="h-5 w-5 text-primary" />
-                Feature Gating - {configuringCompany?.name}
+                Feature Gating — <span className="text-primary">{configuringCompany?.name}</span>
               </DialogTitle>
+              <p className="text-sm text-muted-foreground">Select a plan tier, then fine-tune individual features.</p>
             </DialogHeader>
-            
+
             {featuresLoading ? (
-              <div className="py-12 text-center"><Loader2 className="h-6 w-6 animate-spin mx-auto text-primary" /></div>
+              <div className="py-16 text-center"><Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" /></div>
             ) : (
-              <div className="space-y-6 pt-4">
-                <div className="grid gap-4">
-                  <div className="space-y-2">
-                    <Label>Subscription Tier</Label>
-                    <div className="flex gap-2">
-                      {['basic', 'pro', 'enterprise'].map((t) => (
-                        <Button 
+              <div className="space-y-6 pt-2">
+
+                {/* Plan Tier Selector */}
+                <div>
+                  <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3 block">Subscription Tier</Label>
+                  <div className="grid grid-cols-3 gap-3">
+                    {(['basic', 'pro', 'enterprise'] as const).map((t) => {
+                      const isActive = configuringCompany?.plan_type === t;
+                      const featCount = PLAN_DEFAULTS[t].length;
+                      return (
+                        <button
                           key={t}
                           type="button"
-                          variant={configuringCompany?.plan_type === t ? 'default' : 'outline'}
-                          className="flex-1 capitalize"
                           onClick={() => applyPlanDefaults(t)}
+                          className={`p-4 rounded-xl border-2 text-left transition-all cursor-pointer ${
+                            isActive ? PLAN_ACTIVE_COLORS[t] : PLAN_CARD_COLORS[t]
+                          }`}
                         >
-                          {t}
-                        </Button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="border-t pt-4">
-                    <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-4 block">Enabled Modules</Label>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      {ALL_FEATURES.map((f) => (
-                        <div key={f.key} className="flex items-center justify-between p-3 rounded-xl border bg-muted/20">
-                          <div className="min-w-0 pr-2">
-                            <p className="text-sm font-semibold">{f.label}</p>
-                            <p className="text-[10px] text-muted-foreground line-clamp-1">{f.description}</p>
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-sm font-bold capitalize">{t}</span>
+                            {isActive && <span className="text-xs bg-green-500 text-white px-2 py-0.5 rounded-full font-medium">Active</span>}
                           </div>
-                          <div 
-                            className={`h-5 w-10 rounded-full cursor-pointer transition-colors relative ${currentFeatures[f.key] ? 'bg-primary' : 'bg-muted'}`}
-                            onClick={() => updateFeature(f.key, !currentFeatures[f.key])}
-                          >
-                            <div className={`absolute top-1 left-1 h-3 w-3 rounded-full bg-white transition-transform ${currentFeatures[f.key] ? 'translate-x-5' : ''}`} />
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                          <p className="text-xs text-muted-foreground">{featCount} modules included</p>
+                          <p className="text-[10px] text-muted-foreground mt-1">
+                            {t === 'basic' && 'Core attendance + tasks'}
+                            {t === 'pro' && 'Basic + chat, kudos, helpdesk'}
+                            {t === 'enterprise' && 'All features unlocked'}
+                          </p>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
-                
-                <Button className="w-full" onClick={saveAllFeatures} disabled={savingFeatures}>
-                  {savingFeatures ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Apply Configuration'}
+
+                {/* Features by Tier Group */}
+                <div className="space-y-5">
+                  {(['basic', 'pro', 'enterprise'] as const).map((tier) => {
+                    const tierFeatures = ALL_FEATURES.filter(f => f.plan === tier);
+                    return (
+                      <div key={tier}>
+                        <div className="flex items-center gap-2 mb-3">
+                          <span className={`text-xs font-bold uppercase tracking-wider px-2.5 py-1 rounded-full border ${PLAN_COLORS[tier]}`}>
+                            {tier === 'basic' ? '⭐ Basic' : tier === 'pro' ? '🚀 Pro' : '💎 Enterprise'}
+                          </span>
+                          <div className="h-px flex-1 bg-border" />
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          {tierFeatures.map((f) => {
+                            const isOn = !!currentFeatures[f.key];
+                            return (
+                              <div
+                                key={f.key}
+                                className={`flex items-center justify-between p-3.5 rounded-xl border transition-all cursor-pointer ${
+                                  isOn
+                                    ? 'border-primary/30 bg-primary/5 shadow-sm'
+                                    : 'border-border bg-muted/20 opacity-60'
+                                }`}
+                                onClick={() => updateFeature(f.key, !isOn)}
+                              >
+                                <div className="flex items-center gap-2.5 min-w-0">
+                                  <span className="text-lg">{f.icon}</span>
+                                  <div className="min-w-0">
+                                    <p className="text-sm font-semibold leading-tight">{f.label}</p>
+                                    <p className="text-[10px] text-muted-foreground truncate">{f.description}</p>
+                                  </div>
+                                </div>
+                                <div className={`ml-2 h-6 w-11 rounded-full relative transition-colors flex-shrink-0 ${
+                                  isOn ? 'bg-primary' : 'bg-muted'
+                                }`}>
+                                  <div className={`absolute top-1 left-1 h-4 w-4 rounded-full bg-white shadow transition-transform ${
+                                    isOn ? 'translate-x-5' : ''
+                                  }`} />
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Summary Bar */}
+                <div className="flex items-center justify-between bg-muted/30 rounded-xl px-4 py-3 border">
+                  <div className="text-sm">
+                    <span className="font-bold text-primary">{Object.values(currentFeatures).filter(Boolean).length}</span>
+                    <span className="text-muted-foreground"> of {ALL_FEATURES.length} features enabled</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" onClick={() => {
+                      const all: any = {}; ALL_FEATURES.forEach(f => all[f.key] = true); setCurrentFeatures(all);
+                    }}>Enable All</Button>
+                    <Button variant="outline" size="sm" onClick={() => {
+                      const none: any = {}; ALL_FEATURES.forEach(f => none[f.key] = false); setCurrentFeatures(none);
+                    }}>Disable All</Button>
+                  </div>
+                </div>
+
+                <Button className="w-full h-11 text-base" onClick={saveAllFeatures} disabled={savingFeatures}>
+                  {savingFeatures ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Saving...</> : '💾 Apply Configuration'}
                 </Button>
               </div>
             )}
@@ -1018,6 +1190,7 @@ export default function SuperAdminCompanies() {
                       setEditAddress(c.address || '');
                       setEditLoginPreference(c.login_preference || 'both');
                       setEditIdPrefix(c.employee_id_prefix || '');
+                      setEditPlanType(c.plan_type || 'basic');
                       setEditOwnerName(c.owner_name !== 'Not Set' ? (c.owner_name || '') : '');
                       setEditOwnerEmail((c as any).owner_email || '');
                       setEditOwnerPassword('');

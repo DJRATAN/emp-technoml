@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useCompanyFeatures } from '@/hooks/useCompanyFeatures';
 import { toast } from 'sonner';
 import { TicketIcon, Clock, AlertTriangle } from 'lucide-react';
 import { formatDate } from '@/lib/helpers';
@@ -17,6 +18,7 @@ const priorityColor = (p: string) => p === 'urgent' ? 'destructive' : p === 'hig
 
 export default function AdminHelpdesk() {
   const { user } = useAuth();
+  const { features } = useCompanyFeatures();
   const [tickets, setTickets] = useState<any[]>([]);
   const [employees, setEmployees] = useState<any[]>([]);
   const [active, setActive] = useState<any | null>(null);
@@ -69,6 +71,21 @@ export default function AdminHelpdesk() {
   };
 
   const overdue = (t: any) => t.status !== 'resolved' && t.status !== 'closed' && new Date(t.due_at) < new Date();
+
+  if (!features?.helpdesk_enabled) {
+    return (
+      <DashboardLayout>
+        <div className="mb-6">
+          <h1 className="text-2xl font-heading font-semibold">Helpdesk</h1>
+        </div>
+        <Card className="border-destructive/20 bg-destructive/5">
+          <CardContent className="py-10 text-center text-muted-foreground">
+            This module is disabled for your organization.
+          </CardContent>
+        </Card>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout>

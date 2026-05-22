@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCompanySettings } from '@/hooks/useCompanySettings';
+import { useCompanyFeatures } from '@/hooks/useCompanyFeatures';
 import { supabase } from '@/integrations/supabase/client';
 import { DollarSign, Loader2, Search, Download, TrendingUp, TrendingDown, Clock, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
@@ -30,6 +31,7 @@ type EmployeePayroll = {
 export default function AdminPayroll() {
   const { user } = useAuth();
   const { settings } = useCompanySettings();
+  const { features } = useCompanyFeatures();
   const [loading, setLoading] = useState(true);
   const [employees, setEmployees] = useState<EmployeePayroll[]>([]);
   const [search, setSearch] = useState('');
@@ -146,6 +148,19 @@ export default function AdminPayroll() {
     a.href = url; a.download = `payroll-${month}.csv`; a.click();
     URL.revokeObjectURL(url);
     toast.success('Payroll exported');
+  }
+
+  if (!features?.payroll_export_enabled) {
+    return (
+      <DashboardLayout>
+        <div className="mb-6">
+          <h1 className="text-2xl font-heading font-bold">Payroll Export</h1>
+        </div>
+        <Card className="border-destructive/20 bg-destructive/5 p-6 text-center text-muted-foreground">
+          This module is disabled for your organization.
+        </Card>
+      </DashboardLayout>
+    );
   }
 
   if (loading) return <DashboardLayout><div className="flex items-center justify-center h-96"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div></DashboardLayout>;

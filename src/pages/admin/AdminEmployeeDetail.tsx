@@ -78,6 +78,7 @@ export default function AdminEmployeeDetail() {
   const [resetDialogOpen, setResetDialogOpen] = useState(false);
   const [newPassword, setNewPassword] = useState('');
   const [uploadingIdCard, setUploadingIdCard] = useState(false);
+  const [idCardPreview, setIdCardPreview] = useState<string | null>(null);
   const [resettingPassword, setResettingPassword] = useState(false);
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
@@ -156,6 +157,10 @@ export default function AdminEmployeeDetail() {
         if ((pData as any).avatar_url) {
           const { data: signed } = await supabase.storage.from('avatars').createSignedUrl((pData as any).avatar_url, 3600);
           setAvatarPreview(signed?.signedUrl ?? null);
+        }
+        if ((pData as any).id_card_url) {
+          const { data: signed } = await supabase.storage.from('id-cards' as any).createSignedUrl((pData as any).id_card_url, 3600);
+          setIdCardPreview(signed?.signedUrl ?? null);
         }
       }
 
@@ -370,6 +375,8 @@ export default function AdminEmployeeDetail() {
       if (dbErr) throw dbErr;
 
       update('id_card_url', path);
+      const { data: signed } = await supabase.storage.from('id-cards' as any).createSignedUrl(path, 3600);
+      setIdCardPreview(signed?.signedUrl ?? null);
       toast.success('ID Card updated successfully');
     } catch (err: any) {
       toast.error(err.message);
@@ -668,9 +675,9 @@ export default function AdminEmployeeDetail() {
             
             <div className="flex flex-col sm:flex-row gap-6 items-start sm:items-center">
               <div className="w-full sm:w-64 aspect-[3/2] rounded-xl border-2 border-dashed bg-muted flex items-center justify-center overflow-hidden relative group">
-                {form.id_card_url ? (
+                {idCardPreview ? (
                   <img 
-                    src={supabase.storage.from('id-cards' as any).getPublicUrl(form.id_card_url).data.publicUrl} 
+                    src={idCardPreview} 
                     alt="ID Card" 
                     className="object-contain h-full w-full"
                   />
@@ -680,9 +687,9 @@ export default function AdminEmployeeDetail() {
                     <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">No ID Uploaded</p>
                   </div>
                 )}
-                {form.id_card_url && (
+                {idCardPreview && (
                   <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                    <Button size="sm" variant="secondary" className="h-8" onClick={() => window.open(supabase.storage.from('id-cards' as any).getPublicUrl(form.id_card_url).data.publicUrl, '_blank')}>
+                    <Button size="sm" variant="secondary" className="h-8" onClick={() => window.open(idCardPreview, '_blank')}>
                       <Eye className="h-3 w-3 mr-1" /> View
                     </Button>
                   </div>

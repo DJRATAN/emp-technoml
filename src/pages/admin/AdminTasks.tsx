@@ -10,6 +10,8 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
+import { useCompanyFeatures } from '@/hooks/useCompanyFeatures';
+import { Card, CardContent } from '@/components/ui/card';
 
 /* ── types ─────────────────────────────────────────────────────────── */
 type Priority = 'low' | 'medium' | 'high';
@@ -197,6 +199,7 @@ function AssigneeCell({ value, employees, onChange }: {
 /* ── main component ───────────────────────────────────────────────── */
 export default function AdminTasks() {
   const { user } = useAuth();
+  const { features } = useCompanyFeatures();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [employees, setEmployees] = useState<Emp[]>([]);
   const [loading, setLoading] = useState(true);
@@ -482,21 +485,24 @@ export default function AdminTasks() {
   };
 
   /* ── render ───────────────────────────────────────────────────── */
+  if (!features?.tasks_enabled) {
+    return (
+      <DashboardLayout>
+        <div className="mb-6">
+          <h1 className="text-2xl font-heading font-bold">Tasks</h1>
+        </div>
+        <Card className="border-destructive/20 bg-destructive/5">
+          <CardContent className="py-10 text-center text-muted-foreground">
+            This module is disabled for your organization.
+          </CardContent>
+        </Card>
+      </DashboardLayout>
+    );
+  }
+
   return (
     <DashboardLayout>
       <div className="space-y-5">
-        {/* DEBUG ALERT - REMOVE LATER */}
-        <div className="bg-destructive/10 border-2 border-destructive p-4 rounded-xl flex items-center justify-between gap-4 animate-pulse">
-          <div className="flex items-center gap-3">
-            <AlertCircle className="h-6 w-6 text-destructive" />
-            <div>
-              <p className="font-bold text-destructive">DEBUG MODE ACTIVE</p>
-              <p className="text-xs font-mono">UID: {user?.id?.slice(0,8)}... | Role: {user?.role} | CoID: {user?.companyId || 'NULL'} | Raw Tasks: {tasks.length}</p>
-            </div>
-          </div>
-          <Button size="sm" variant="destructive" onClick={() => load()}>Reload Data</Button>
-        </div>
-
         {/* Header */}
         <div className="flex items-center justify-between gap-4 flex-wrap">
           <div>

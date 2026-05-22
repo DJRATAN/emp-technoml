@@ -33,14 +33,15 @@ export function AppSidebar() {
   const employeeMenu = [
     { title: 'Dashboard', url: '/employee', icon: LayoutDashboard, show: true },
     { title: 'Attendance', url: '/employee/attendance', icon: Clock, show: true },
-    { title: 'Tasks', url: '/employee/tasks', icon: CheckSquare, show: true }, // Standard for all
+    { title: 'Tasks', url: '/employee/tasks', icon: CheckSquare, show: isEnabled('tasks_enabled') },
     { title: 'My Targets', url: '/employee/targets', icon: Target, show: true },
     { title: 'Leave', url: '/employee/leave', icon: CalendarDays, show: true },
     { title: 'Performance', url: '/employee/performance', icon: TrendingUp, show: true },
-    { title: 'Kudos', url: '/employee/kudos', icon: Award, show: isPro }, // Plan-locked
-    { title: 'Chat', url: '/employee/chat', icon: MessageSquare, show: isPro }, // Plan-locked
+    { title: 'Kudos', url: '/employee/kudos', icon: Award, show: isEnabled('kudos_enabled') },
+    { title: 'Chat', url: '/employee/chat', icon: MessageSquare, show: isEnabled('chat_enabled') },
+    { title: 'Birthdays', url: '/employee/birthdays', icon: CalendarDays, show: isEnabled('birthdays_enabled') },
     { title: 'Office Updates', url: '/employee/inbox', icon: Mail, show: true },
-    { title: 'Helpdesk', url: '/employee/helpdesk', icon: LifeBuoy, show: isPro }, // Plan-locked
+    { title: 'Helpdesk', url: '/employee/helpdesk', icon: LifeBuoy, show: isEnabled('helpdesk_enabled') },
     { title: 'Profile', url: '/employee/profile', icon: User, show: true },
   ].filter(i => i.show);
 
@@ -50,17 +51,23 @@ export function AppSidebar() {
     { title: 'Settings', url: '/admin/settings', icon: Settings, show: true },
     { title: 'Attendance', url: '/admin/attendance', icon: Clock, show: true },
     { title: 'Live Map', url: '/admin/live-map', icon: MapPin, show: true },
-    { title: 'Tasks', url: '/admin/tasks', icon: CheckSquare, show: true },
+    { title: 'Tasks', url: '/admin/tasks', icon: CheckSquare, show: isEnabled('tasks_enabled') },
     { title: 'Targets', url: '/admin/targets', icon: Target, show: true },
     { title: 'Leave Requests', url: '/admin/leave', icon: CalendarDays, show: true },
-    { title: 'Helpdesk', url: '/admin/helpdesk', icon: LifeBuoy, show: isPro },
+    { title: 'Helpdesk', url: '/admin/helpdesk', icon: LifeBuoy, show: isEnabled('helpdesk_enabled') },
+    { title: 'Chat', url: '/admin/chat', icon: MessageSquare, show: isEnabled('chat_enabled') },
+    { title: 'Kudos', url: '/admin/kudos', icon: Award, show: isEnabled('kudos_enabled') },
+    { title: 'Birthdays', url: '/admin/birthdays', icon: CalendarDays, show: isEnabled('birthdays_enabled') },
     { title: 'Communication', url: '/admin/communication', icon: Megaphone, show: true },
-    { title: 'Wellbeing', url: '/admin/wellbeing', icon: HeartPulse, show: isEnterprise }, // Enterprise-locked
-    { title: 'Payroll', url: '/admin/payroll', icon: DollarSign, show: isEnterprise }, // Enterprise-locked
+    { title: 'Wellbeing', url: '/admin/wellbeing', icon: HeartPulse, show: isEnabled('wellbeing_enabled') },
+    { title: 'Payroll', url: '/admin/payroll', icon: DollarSign, show: isEnabled('payroll_export_enabled') },
+    { title: 'AI Analytics', url: '/admin/ai-analytics', icon: TrendingUp, show: isEnabled('ai_analytics_enabled') },
+    { title: 'IP Whitelisting', url: '/admin/ip-whitelist', icon: Globe, show: isEnabled('ip_whitelist_enabled') },
+    { title: 'Mock GPS', url: '/admin/mock-gps', icon: MapPin, show: isEnabled('mock_gps_detection_enabled') },
     { title: 'Audit Trail', url: '/admin/audit', icon: Shield, show: true },
     { title: 'Permissions', url: '/admin/permissions', icon: Shield, show: true },
     { title: 'Corrections', url: '/admin/corrections', icon: Clock, show: true },
-    { title: 'Approval Chain', url: '/admin/approval-chain', icon: GitBranch, show: true },
+    { title: 'Approval Chain', url: '/admin/approval-chain', icon: GitBranch, show: isEnabled('multi_level_approvals_enabled') },
     { title: 'Reports', url: '/admin/reports', icon: FileBarChart, show: true },
     { title: 'Features', url: '/admin/features', icon: ToggleLeft, show: true },
   ].filter(i => i.show);

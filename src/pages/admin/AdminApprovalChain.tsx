@@ -34,9 +34,13 @@ export default function AdminApprovalChain() {
 
   const toggleEnabled = async (v: boolean) => {
     if (!user?.companyId) return;
-    await supabase.from('company_features' as any).upsert({ company_id: user.companyId, multi_level_approvals_enabled: v });
-    toast.success(v ? 'Multi-level approvals enabled' : 'Disabled');
-    refresh();
+    const { error } = await supabase.from('company_features' as any).upsert({ company_id: user.companyId, multi_level_approvals_enabled: v });
+    if (error) {
+      toast.error('Failed to update: ' + error.message);
+    } else {
+      toast.success(v ? 'Multi-level approvals enabled' : 'Disabled');
+      refresh();
+    }
   };
 
   const addStep = async () => {
@@ -46,14 +50,19 @@ export default function AdminApprovalChain() {
       company_id: user.companyId, leave_type: 'all', step_order: next,
       role_label: roleLabel.trim(), approver_user_id: approver,
     });
-    if (error) return toast.error(error.message);
+    if (error) return toast.error('Failed to add step: ' + error.message);
     setApprover('');
     load();
   };
 
   const removeStep = async (id: string) => {
-    await supabase.from('approval_chains' as any).delete().eq('id', id);
-    load();
+    const { error } = await supabase.from('approval_chains' as any).delete().eq('id', id);
+    if (error) {
+      toast.error('Failed to remove step: ' + error.message);
+    } else {
+      toast.success('Step removed successfully');
+      load();
+    }
   };
 
   return (

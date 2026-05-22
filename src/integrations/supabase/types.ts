@@ -451,6 +451,7 @@ export type Database = {
           birthdays_enabled: boolean
           chat_enabled: boolean
           company_id: string
+          feature_visibility: Json | null
           helpdesk_enabled: boolean
           ip_whitelist_enabled: boolean
           kudos_enabled: boolean
@@ -462,6 +463,7 @@ export type Database = {
           birthdays_enabled?: boolean
           chat_enabled?: boolean
           company_id: string
+          feature_visibility?: Json | null
           helpdesk_enabled?: boolean
           ip_whitelist_enabled?: boolean
           kudos_enabled?: boolean
@@ -473,6 +475,7 @@ export type Database = {
           birthdays_enabled?: boolean
           chat_enabled?: boolean
           company_id?: string
+          feature_visibility?: Json | null
           helpdesk_enabled?: boolean
           ip_whitelist_enabled?: boolean
           kudos_enabled?: boolean

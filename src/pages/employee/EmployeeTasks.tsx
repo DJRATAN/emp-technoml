@@ -11,6 +11,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Calendar, Loader2, Target, Lock } from 'lucide-react';
 import { toast } from 'sonner';
+import { useCompanyFeatures } from '@/hooks/useCompanyFeatures';
 
 type Task = { id: string; title: string; description: string | null; priority: 'low'|'medium'|'high';
   status: 'pending'|'in_progress'|'completed'; due_date: string | null;
@@ -25,6 +26,7 @@ const priorityVariant: Record<string, 'destructive' | 'default' | 'secondary'> =
 
 export default function EmployeeTasks() {
   const { user } = useAuth();
+  const { features } = useCompanyFeatures();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [updatingAction, setUpdatingAction] = useState<{id: string, action: string} | null>(null);
@@ -172,6 +174,19 @@ export default function EmployeeTasks() {
     if (loading) return <div className="text-center py-12"><Loader2 className="h-6 w-6 animate-spin text-primary mx-auto" /></div>;
     if (items.length === 0) return <p className="text-sm text-muted-foreground py-12 text-center">No tasks here.</p>;
     return <div className="space-y-3">{items.map((t) => <TaskCard key={t.id} t={t} />)}</div>;
+  }
+
+  if (!features?.tasks_enabled) {
+    return (
+      <DashboardLayout>
+        <div className="mb-6">
+          <h1 className="text-2xl font-heading font-bold">My Tasks</h1>
+        </div>
+        <Card className="p-6 text-center text-muted-foreground">
+          This feature is disabled by your administrator.
+        </Card>
+      </DashboardLayout>
+    );
   }
 
   return (

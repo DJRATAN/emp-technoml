@@ -1,3 +1,4 @@
+import React, { createContext, useContext } from 'react';
 import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { AppSidebar } from './AppSidebar';
 import { useAuth } from '@/contexts/AuthContext';
@@ -14,13 +15,70 @@ import { useAdminNotifications, NotificationItem } from '@/hooks/useAdminNotific
 import { useTheme } from '@/hooks/useTheme';
 import { NotificationsBell } from '@/components/NotificationsBell';
 
+export const DashboardLayoutContext = createContext<boolean>(false);
+
 const iconFor = (kind: NotificationItem['kind']) => {
   if (kind === 'pending_employee') return UserCheck;
   if (kind === 'pending_leave') return CalendarDays;
   return AlertTriangle;
 };
 
+function hexToHsl(hex: string): string {
+  hex = hex.replace(/^#/, '');
+  if (hex.length === 3) {
+    hex = hex[0] + hex[0] + hex[1] + hex[1] + hex[2] + hex[2];
+  }
+  const r = parseInt(hex.substring(0, 2), 16) / 255;
+  const g = parseInt(hex.substring(2, 4), 16) / 255;
+  const b = parseInt(hex.substring(4, 6), 16) / 255;
+
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  let h = 0;
+  let s = 0;
+  const l = (max + min) / 2;
+
+  if (max !== min) {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    switch (max) {
+      case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+      case g: h = (b - r) / d + 2; break;
+      case b: h = (r - g) / d + 4; break;
+    }
+    h /= 6;
+  }
+
+  return `${Math.round(h * 360)} ${Math.round(s * 100)}% ${Math.round(l * 100)}%`;
+}
+
+function getRelativeLuminance(r: number, g: number, b: number): number {
+  const a = [r, g, b].map(v => {
+    return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+  });
+  return a[0] * 0.2126 + a[1] * 0.7152 + a[2] * 0.0722;
+}
+
+function getPrimaryForeground(hex: string): string {
+  hex = hex.replace(/^#/, '');
+  if (hex.length === 3) {
+    hex = hex[0] + hex[0] + hex[1] + hex[1] + hex[2] + hex[2];
+  }
+  const r = parseInt(hex.substring(0, 2), 16) / 255;
+  const g = parseInt(hex.substring(2, 4), 16) / 255;
+  const b = parseInt(hex.substring(4, 6), 16) / 255;
+
+  const L = getRelativeLuminance(r, g, b);
+  return L > 0.179 ? '212 60% 12%' : '0 0% 100%';
+}
+
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
+  const isNested = useContext(DashboardLayoutContext);
+
+  if (isNested) {
+    return <>{children}</>;
+  }
+
   const { user, logout } = useAuth();
   const initial = user?.name?.charAt(0)?.toUpperCase() ?? '?';
   const { items, count } = useAdminNotifications();
@@ -40,10 +98,19 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
   };
 
   const themeColor = user?.company?.themeColor || '#0ea5e9';
+  const primaryHsl = hexToHsl(themeColor);
+  const primaryForegroundHsl = getPrimaryForeground(themeColor);
 
   return (
-    <SidebarProvider>
-      <div className="min-h-screen flex w-full" style={{ '--primary': themeColor } as any}>
+    <DashboardLayoutContext.Provider value={true}>
+      <SidebarProvider>
+      <div 
+        className="min-h-screen flex w-full" 
+        style={{ 
+          '--primary': primaryHsl,
+          '--primary-foreground': primaryForegroundHsl
+        } as any}
+      >
         <AppSidebar />
         <div className="flex-1 flex flex-col min-w-0">
           <header className="h-14 flex items-center justify-between border-b bg-card px-4 sticky top-0 z-10">
@@ -137,5 +204,6 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
         </div>
       </div>
     </SidebarProvider>
+    </DashboardLayoutContext.Provider>
   );
 }

@@ -13,9 +13,11 @@ import { Button } from '@/components/ui/button';
 import { useCompanySettings } from '@/hooks/useCompanySettings';
 import { EmployeeIdCard } from '@/components/EmployeeIdCard';
 import { BirthdaysCard } from '@/components/BirthdaysCard';
+import { useCompanyFeatures } from '@/hooks/useCompanyFeatures';
 
 export default function EmployeeDashboard() {
   const { user } = useAuth();
+  const { features } = useCompanyFeatures();
   const { settings } = useCompanySettings();
   const [todayAtt, setTodayAtt] = useState<any>(null);
   const [taskCounts, setTaskCounts] = useState({ total: 0, completed: 0, inProgress: 0 });
@@ -111,8 +113,8 @@ export default function EmployeeDashboard() {
           )}
         </div>
         <div className="grid gap-4 lg:grid-cols-3">
-          <div className="lg:col-span-2"><EmployeeIdCard /></div>
-          <BirthdaysCard />
+          <div className={features?.birthdays_enabled !== false ? "lg:col-span-2" : "lg:col-span-3"}><EmployeeIdCard /></div>
+          {features?.birthdays_enabled !== false && <BirthdaysCard />}
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <StatCard label="Today's Attendance" value={todayAtt ? (todayAtt.status === 'late' ? 'Late' : 'Present') : 'Not marked'} icon={Clock} description={todayAtt?.check_in ? `Checked in at ${formatTime(todayAtt.check_in)}` : 'Mark your attendance'} />

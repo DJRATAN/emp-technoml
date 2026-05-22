@@ -124,7 +124,7 @@ export default function EmployeeChat() {
           <CardContent className="flex-1 overflow-auto space-y-2">
             {messages.map(m => (
               <div key={m.id} className={`flex flex-col ${m.author_id === user?.id ? 'items-end' : 'items-start'}`}>
-                <div className={`max-w-[75%] px-3 py-2 rounded-2xl text-sm ${m.author_id === user?.id ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
+                <div className={`max-w-[75%] px-3 py-2 rounded-2xl text-sm ${m.author_id === user?.id ? 'bg-primary text-primary-foreground' : 'bg-muted text-foreground'}`}>
                   {m.author_id !== user?.id && <p className="text-[10px] font-semibold mb-0.5 opacity-70">{authors.get(m.author_id) ?? '...'}</p>}
                   {m.body}
                 </div>

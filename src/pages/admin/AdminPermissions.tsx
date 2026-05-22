@@ -86,14 +86,35 @@ export default function AdminPermissions() {
       [field]: value
     };
 
-    const { error } = await supabase
+    // Check if a record exists for this admin — id column may be NULL so match on admin_id+company_id
+    const { data: existing } = await supabase
       .from('admin_permissions' as any)
-      .upsert({
-        admin_id: adminId,
-        company_id: user.companyId,
-        ...newPerms,
-        updated_at: new Date().toISOString()
-      }, { onConflict: 'company_id,admin_id' });
+      .select('admin_id')
+      .eq('company_id', user.companyId)
+      .eq('admin_id', adminId)
+      .maybeSingle();
+
+    let error;
+    if (existing) {
+      // Update by admin_id + company_id (id column has no default and may be NULL)
+      const result = await supabase
+        .from('admin_permissions' as any)
+        .update({ ...newPerms, updated_at: new Date().toISOString() })
+        .eq('company_id', user.companyId)
+        .eq('admin_id', adminId);
+      error = result.error;
+    } else {
+      // Insert new record
+      const result = await supabase
+        .from('admin_permissions' as any)
+        .insert({
+          admin_id: adminId,
+          company_id: user.companyId,
+          ...newPerms,
+          updated_at: new Date().toISOString()
+        });
+      error = result.error;
+    }
 
     setSaving(null);
 
