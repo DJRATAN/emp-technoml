@@ -168,7 +168,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button className="h-8 w-8 rounded-full bg-primary flex items-center justify-center hover:opacity-90 transition focus:outline-none focus:ring-2 focus:ring-primary/50" aria-label="Account menu">
-                    <span className="text-xs font-medium text-primary">{initial}</span>
+                    <span className="text-xs font-medium text-primary-foreground">{initial}</span>
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56">

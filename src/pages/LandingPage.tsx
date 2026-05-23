@@ -166,18 +166,18 @@ const FEATURES = [
   { icon: MapPin, title: "GPS Live Map", desc: "Real-time live map of all employee locations. Restrict check-in to office geofence with configurable radius.", hasPreview: false },
   { icon: Calendar, title: "Leave Management", desc: "Apply, approve, and track leaves with multi-level approval chains, SLA countdown, and annual/sick/casual quotas.", hasPreview: true },
   { icon: Target, title: "Tasks & Targets", desc: "Assign tasks with priority & due dates. Monthly targets with sub-task dependency chains and progress tracking.", hasPreview: true },
-  { icon: Clock, title: "Attendance Corrections", desc: "Employees request punch-time corrections. Admins review with original GPS and selfie evidence before approving.", hasPreview: false },
+  { icon: ShieldCheck, title: "Enterprise Security", desc: "SSO/SAML integration, Two-Factor Authentication (2FA), and active session management.", hasPreview: false },
   { icon: Send, title: "Admin Broadcasts", desc: "Top-down official communication channel with read receipts, acknowledgements, and file attachments.", hasPreview: true },
   { icon: BarChart3, title: "Reports & Analytics", desc: "Company-wide attendance trends, performance metrics, payroll summaries, and predictive attrition insights.", hasPreview: false },
   { icon: MessageSquare, title: "Team Chat", desc: "Real-time tenant-scoped messaging. Office Updates inbox keeps official comms separate from casual chat.", hasPreview: false },
   { icon: Star, title: "Kudos & Recognition", desc: "Peer recognition wall with Star, Helpful, MVP badges — boost team morale and engagement.", hasPreview: false },
-  { icon: Headphones, title: "Helpdesk Ticketing", desc: "Full internal ticketing with categories, priorities, SLA tracking, and file attachments.", hasPreview: false },
+  { icon: Lock, title: "Custom Roles & Permissions", desc: "Granular permission matrix to define exactly what your admins, managers, and employees can see and do.", hasPreview: false },
   { icon: FileText, title: "Payroll & Payslips", desc: "Auto-generate payslips from salary, attendance, and deductions. Download PDF payslips each month.", hasPreview: false },
-  { icon: ArrowRight, title: "Approval Chains", desc: "Configurable multi-step approval workflows for leaves and corrections. Custom Team Lead → HR chains.", hasPreview: false },
-  { icon: TrendingUp, title: "Employee Wellbeing", desc: "Daily mood tracking, burnout risk scoring, and wellness heatmaps to keep your team healthy.", hasPreview: false },
-  { icon: ShieldCheck, title: "Audit Trail", desc: "Immutable log of every admin action — approvals, settings changes, broadcasts — for full compliance.", hasPreview: false },
-  { icon: Lock, title: "Admin Permissions", desc: "Granular permission matrix — control which admins can reset passwords, manage payroll, or view chat.", hasPreview: false },
-  { icon: Zap, title: "Multi-Tenant Security", desc: "Company-level data isolation with RLS, feature flags, role-based access, and session kill-switch.", hasPreview: false },
+  { icon: ArrowRight, title: "Approval Workflows", desc: "Configurable multi-step approval workflows for leaves, corrections, and custom requests.", hasPreview: false },
+  { icon: Globe, title: "White-Labeling", desc: "Custom domains, custom branding (logo, colors), and custom email templates for your organization.", hasPreview: false },
+  { icon: CheckCircle2, title: "Audit Trails", desc: "Immutable log of every action — approvals, settings changes, broadcasts — for full compliance.", hasPreview: false },
+  { icon: Zap, title: "API & Webhooks", desc: "Developer settings for generating API keys and webhooks to integrate with your existing tools.", hasPreview: false },
+  { icon: ShieldCheck, title: "Multi-Tenant Architecture", desc: "Strict data isolation with Row Level Security (RLS) ensuring your data is completely separated.", hasPreview: false },
 ];
 
 function FeaturesSection() {
@@ -317,13 +317,13 @@ function PricingSection() {
       cta: "Start Free", popular: false,
     },
     {
-      name: "Professional", price: "₹99", period: "/user/mo", desc: "For growing businesses",
-      features: ["Unlimited employees", "Everything in Starter", "Tasks, targets & approval chains", "Payroll & payslips", "Admin broadcasts & read receipts", "Team chat & kudos wall", "Employee wellbeing & mood tracking", "Audit trail & admin permissions", "Reports & analytics", "Priority support"],
+      name: "Professional", price: "₹199", period: "/user/mo", desc: "For growing businesses",
+      features: ["Unlimited employees", "Everything in Starter", "Tasks, targets & workflows", "Payroll & payslips", "Team chat & kudos", "Role-based access control", "Audit logs", "Priority support"],
       cta: "Start Trial", popular: true,
     },
     {
       name: "Enterprise", price: "Custom", period: "", desc: "For large organizations",
-      features: ["Everything in Professional", "Custom branding & logo upload", "SSO / SAML integration", "Dedicated account manager", "API access & webhooks", "On-premise deployment", "SLA guarantee", "Predictive attrition analytics", "Custom integrations"],
+      features: ["Everything in Professional", "Custom branding & white-labeling", "SSO / SAML integration", "API access & webhooks", "Dedicated account manager", "On-premise deployment", "SLA guarantee", "Custom integrations"],
       cta: "Contact Sales", popular: false,
     },
   ];
@@ -366,9 +366,9 @@ function PricingSection() {
 /* ─── Testimonials ─── */
 function TestimonialsSection() {
   const items = [
-    { img: testimonial1, name: "Sarah Chen", role: "HR Director, TechVista", text: "TechnoML transformed our attendance process. Face verification eliminated buddy punching completely. The geofencing gives us peace of mind for remote offices." },
-    { img: testimonial2, name: "James Miller", role: "CEO, GrowthLabs", text: "We went from spreadsheets to a fully automated system in one day. The multi-level approval chains and real-time analytics saved us hours every week." },
-    { img: testimonial3, name: "Priya Patel", role: "Operations Lead, ScaleUp", text: "The helpdesk and team chat features keep everything in one place. Our employees love the kudos wall — it boosted team morale significantly." },
+    { img: testimonial1, name: "Rajesh Kumar", role: "CTO, TechBite Solutions", text: "TechnoML transformed our attendance process. Face verification eliminated buddy punching completely. The geofencing gives us peace of mind for remote offices across India." },
+    { img: testimonial2, name: "Priya Sharma", role: "HR Head, ZenithWorks", text: "We went from spreadsheets to a fully automated system in one day. The multi-level approval chains and real-time analytics saved our HR team hours every week." },
+    { img: testimonial3, name: "Ananya Singh", role: "Director, CloudScale", text: "The security features, granular roles, and audit logs made it an easy choice for our enterprise. It's the most robust multi-tenant system we've used." },
   ];
   return (
     <section id="testimonials" className="bg-background py-16 lg:py-24">
