@@ -190,7 +190,7 @@ function AppRoutes() {
         <Route path="/admin/mock-gps" element={<ProtectedRoute allow={['admin', 'super_admin']}><AdminMockGPS /></ProtectedRoute>} />
       </Route>
 
-      <Route path="*" element={<NotFound />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 }
