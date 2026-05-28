@@ -439,13 +439,37 @@ function FAQSection() {
 function CTASection() {
   const navigate = useNavigate();
   return (
-    <section className="bg-primary py-16 text-primary-foreground lg:py-20">
-      <div className="mx-auto max-w-3xl px-4 text-center lg:px-8">
-        <h2 className="font-[Poppins] text-3xl font-bold lg:text-4xl">Ready to Transform Your Workforce Management?</h2>
-        <p className="mx-auto mt-3 max-w-lg text-primary-foreground/80">Join 500+ companies already using TechnoML to streamline attendance, leave, tasks, and team collaboration.</p>
-        <div className="mt-8 flex flex-wrap justify-center gap-4">
-          <Button size="lg" variant="secondary" onClick={() => navigate("/login")} className="gap-2">Get Started Free <ArrowRight className="h-4 w-4" /></Button>
-          <Button size="lg" variant="outline" className="border-primary-foreground/30 text-primary hover:bg-primary-foreground/10 hover:text-white" onClick={() => navigate("/pricing")}>View Pricing</Button>
+    <section className="relative overflow-hidden bg-slate-900 py-24 lg:py-32">
+      {/* Decorative background elements */}
+      <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 mix-blend-overlay"></div>
+      <div className="absolute -top-24 -left-24 h-96 w-96 rounded-full bg-primary/30 blur-3xl filter"></div>
+      <div className="absolute -bottom-24 -right-24 h-96 w-96 rounded-full bg-blue-500/20 blur-3xl filter"></div>
+      
+      <div className="relative mx-auto max-w-4xl px-4 text-center lg:px-8">
+        <div className="rounded-3xl border border-white/10 bg-white/5 p-8 backdrop-blur-md shadow-2xl lg:p-16">
+          <h2 className="font-[Poppins] text-4xl font-extrabold text-white lg:text-5xl tracking-tight">
+            Ready to Transform Your <span className="bg-gradient-to-r from-blue-400 to-primary bg-clip-text text-transparent">Workforce Management?</span>
+          </h2>
+          <p className="mx-auto mt-6 max-w-2xl text-lg text-slate-300">
+            Join 500+ companies already using TechnoML to streamline attendance, leave, tasks, and team collaboration.
+          </p>
+          <div className="mt-10 flex flex-wrap justify-center gap-5">
+            <Button 
+              size="lg" 
+              className="h-14 rounded-full px-8 text-base font-semibold shadow-lg transition-transform hover:scale-105 hover:shadow-primary/25 gap-2"
+              onClick={() => navigate("/login")}
+            >
+              Get Started Free <ArrowRight className="h-5 w-5" />
+            </Button>
+            <Button 
+              size="lg" 
+              variant="outline" 
+              className="h-14 rounded-full border-white/20 bg-white/5 px-8 text-base font-semibold text-white backdrop-blur-md transition-all hover:bg-white/10 hover:scale-105" 
+              onClick={() => navigate("/pricing")}
+            >
+              View Pricing
+            </Button>
+          </div>
         </div>
       </div>
     </section>
@@ -467,7 +491,7 @@ function Footer() {
     const { error } = await supabase.from("companies").insert({ name: domain.charAt(0).toUpperCase() + domain.slice(1), slug, status: "active" });
     setSending(false);
     if (error) {
-      toast.error("Could not create workspace. Please try again.");
+      toast.error("Could not create workspace. Please try again.", { description: error.message });
     } else {
       toast.success("Workspace created! Check your email for next steps.", { description: `Slug: ${slug}` });
       setFooterEmail("");
@@ -480,39 +504,80 @@ function Footer() {
     { title: "Support", links: ["Help Center", "Contact", "Status", "Security", "Privacy Policy"] },
   ];
   return (
-    <footer className="border-t border-border/60 bg-card py-12">
-      <div className="mx-auto grid max-w-7xl gap-8 px-4 md:grid-cols-4 lg:px-8">
-        <div>
-          <span className="font-[Poppins] text-xl font-bold text-primary">TechnoML</span>
-          <p className="mt-2 text-sm text-muted-foreground">Smart employee management for modern businesses.</p>
-          {/* Email signup */}
-          <form onSubmit={handleFooterSignup} className="mt-4 flex gap-2">
-            <Input
-              type="email"
-              placeholder="your@company.com"
-              value={footerEmail}
-              onChange={(e) => setFooterEmail(e.target.value)}
-              className="h-9 text-xs"
-            />
-            <Button type="submit" size="sm" disabled={sending} className="shrink-0 gap-1">
-              <Send className="h-3 w-3" /> {sending ? "…" : "Go"}
-            </Button>
-          </form>
-          <p className="mt-1 text-xs text-muted-foreground">Create a free workspace instantly</p>
+    <footer className="border-t border-border/40 bg-slate-50 pt-16 pb-8 dark:bg-background">
+      <div className="mx-auto grid max-w-7xl gap-12 px-4 md:grid-cols-5 lg:px-8">
+        <div className="md:col-span-2">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary shadow-sm">
+               <Zap className="h-5 w-5 text-white" />
+            </div>
+            <span className="font-[Poppins] text-2xl font-bold text-slate-900 dark:text-white">TechnoML</span>
+          </div>
+          <p className="mt-2 text-sm text-slate-600 dark:text-muted-foreground max-w-sm leading-relaxed">
+            Smart employee management for modern businesses. Streamline attendance, tasks, and leave seamlessly.
+          </p>
+          
+          {/* Elegant Email signup */}
+          <div className="mt-8 max-w-md">
+            <h4 className="mb-3 text-sm font-semibold text-slate-900 dark:text-foreground">Subscribe for Updates & Early Access</h4>
+            <form onSubmit={handleFooterSignup} className="relative flex items-center shadow-sm">
+              <div className="absolute left-3 text-slate-400">
+                <Send className="h-4 w-4" />
+              </div>
+              <Input
+                type="email"
+                placeholder="your@company.com"
+                value={footerEmail}
+                onChange={(e) => setFooterEmail(e.target.value)}
+                className="h-12 w-full rounded-full border-slate-200 bg-white pl-10 pr-32 text-sm focus:border-primary focus:ring-primary dark:border-border/60 dark:bg-card"
+              />
+              <Button 
+                type="submit" 
+                disabled={sending} 
+                className="absolute right-1 h-10 rounded-full bg-primary px-6 font-medium text-white transition-all hover:bg-primary/90 hover:shadow-md"
+              >
+                {sending ? "Creating..." : "Subscribe"}
+              </Button>
+            </form>
+            <p className="mt-2 text-xs text-slate-500 dark:text-muted-foreground ml-2">Create a free workspace instantly. No credit card required.</p>
+          </div>
         </div>
+        
         {cols.map((c) => (
           <div key={c.title}>
-            <h4 className="mb-3 text-sm font-semibold text-foreground">{c.title}</h4>
-            <ul className="space-y-2">
+            <h4 className="mb-5 text-sm font-bold tracking-wider text-slate-900 uppercase dark:text-foreground">{c.title}</h4>
+            <ul className="space-y-3">
               {c.links.map((l) => (
-                <li key={l}><a href={l === "Pricing" ? "/pricing" : "#"} className="text-sm text-muted-foreground transition hover:text-primary">{l}</a></li>
+                <li key={l}>
+                  <a 
+                    href={l === "Pricing" ? "/pricing" : "#"} 
+                    className="text-sm font-medium text-slate-500 transition-colors hover:text-primary dark:text-muted-foreground dark:hover:text-primary"
+                  >
+                    {l}
+                  </a>
+                </li>
               ))}
             </ul>
           </div>
         ))}
       </div>
-      <div className="mx-auto mt-10 max-w-7xl border-t border-border/40 px-4 pt-6 text-center text-xs text-muted-foreground lg:px-8">
-        © {new Date().getFullYear()} TechnoML. All rights reserved.
+      
+      <div className="mx-auto mt-16 max-w-7xl border-t border-slate-200/60 px-4 pt-8 dark:border-border/40 lg:px-8">
+        <div className="flex flex-col items-center justify-between gap-4 md:flex-row">
+          <p className="text-sm text-slate-500 dark:text-muted-foreground">
+            © {new Date().getFullYear()} TechnoML. All rights reserved.
+          </p>
+          <div className="flex gap-4">
+            {['Twitter', 'LinkedIn', 'GitHub'].map((social) => (
+              <a key={social} href="#" className="text-slate-400 hover:text-primary transition-colors">
+                <span className="sr-only">{social}</span>
+                <div className="h-8 w-8 rounded-full bg-slate-100 flex items-center justify-center dark:bg-card">
+                  <div className="h-1.5 w-1.5 rounded-full bg-current"></div>
+                </div>
+              </a>
+            ))}
+          </div>
+        </div>
       </div>
     </footer>
   );
