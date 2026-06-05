@@ -13,13 +13,16 @@ export default function AdminReports() {
 
   useEffect(() => {
     Promise.all([
-      supabase.from('tasks').select('status, profiles!assigned_to(full_name)'),
+      supabase.from('tasks').select('status, assigned_to'),
       supabase.from('attendance').select('status').gte('date', new Date(Date.now() - 30 * 86400000).toISOString().split('T')[0]),
-      supabase.from('profiles').select('department').eq('status', 'approved'),
+      supabase.from('profiles').select('id, full_name, department').eq('status', 'approved'),
     ]).then(([t, a, d]) => {
+      // Build profile lookup from the profiles query
+      const profileMap = new Map((d.data ?? []).map((p: any) => [p.id, p]));
+      
       const map: Record<string, { name: string; completed: number; pending: number }> = {};
       ((t.data ?? []) as any[]).forEach((r) => {
-        const name = r.profiles?.full_name ?? 'Unassigned';
+        const name = profileMap.get(r.assigned_to)?.full_name ?? 'Unassigned';
         map[name] = map[name] ?? { name, completed: 0, pending: 0 };
         if (r.status === 'completed') map[name].completed++; else map[name].pending++;
       });

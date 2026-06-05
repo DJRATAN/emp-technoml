@@ -46,11 +46,7 @@ export default function AdminCorrections() {
 
     const { data, error } = await supabase
       .from('attendance_corrections' as any)
-      .select(`
-        *,
-        profiles:user_id (full_name, email, department),
-        attendance:original_attendance_id (check_in, check_out, selfie_path, latitude, longitude, distance_m, status)
-      `)
+      .select('*')
       .eq('company_id', user.companyId)
       .eq('status', 'pending')
       .order('created_at', { ascending: false });
@@ -69,7 +65,36 @@ export default function AdminCorrections() {
       }
       setRequests([]);
     } else {
-      setRequests((data as any) ?? []);
+      const rows = (data as any[] ?? []);
+      
+      // Fetch profiles separately (FK type mismatch: text vs uuid)
+      const userIds = [...new Set(rows.map((d: any) => d.user_id).filter(Boolean))];
+      let profileMap = new Map();
+      if (userIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, full_name, email, department')
+          .in('id', userIds);
+        profileMap = new Map((profiles ?? []).map(p => [p.id, p]));
+      }
+
+      // Fetch attendance records separately (FK type mismatch: text vs uuid)
+      const attIds = [...new Set(rows.map((d: any) => d.original_attendance_id).filter(Boolean))];
+      let attMap = new Map();
+      if (attIds.length > 0) {
+        const { data: attData } = await supabase
+          .from('attendance')
+          .select('id, check_in, check_out, selfie_path, latitude, longitude, distance_m, location_verified, status')
+          .in('id', attIds);
+        attMap = new Map((attData ?? []).map(a => [a.id, a]));
+      }
+
+      const merged = rows.map((d: any) => ({
+        ...d,
+        profiles: profileMap.get(d.user_id) || { full_name: 'Unknown', email: '', department: null },
+        attendance: attMap.get(d.original_attendance_id) || null,
+      }));
+      setRequests(merged);
     }
     setLoading(false);
   }, [user?.companyId]);

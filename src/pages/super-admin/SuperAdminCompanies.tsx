@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, Plus, Building2, Users, Clock, Shield, UserCog, UserCheck, Lock, Globe, Trash2, Check, X } from 'lucide-react';
+import { Loader2, Plus, Building2, Users, Clock, Shield, UserCog, UserCheck, Lock, Globe, Trash2, Check, X, Star, Zap, Crown } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   AlertDialog,
@@ -443,9 +443,13 @@ export default function SuperAdminCompanies() {
           });
           if (fnErr || !fnData?.success) {
             toast.error(`Admin creation failed: ${fnErr?.message || fnData?.error || 'Unknown error'}`);
+            setSubmitting(false);
+            return;
           }
         } catch (e: any) {
           toast.error(`Error: ${e.message}`);
+          setSubmitting(false);
+          return;
         }
       }
 
@@ -568,8 +572,12 @@ export default function SuperAdminCompanies() {
     if (!deletingCompany) return;
     setIsDeleting(true);
     try {
-      const { error } = await supabase.from('companies').delete().eq('id', deletingCompany.id);
+      const { data, error } = await (supabase as any).rpc('admin_delete_company', {
+        p_company_id: deletingCompany.id
+      });
+      
       if (error) throw error;
+      
       toast.success(`Company ${deletingCompany.name} deleted successfully.`);
       setDeleteOpen(false);
       load();
@@ -611,7 +619,12 @@ export default function SuperAdminCompanies() {
                       <Input required placeholder="e.g. Acme Corp" value={name} onChange={(e) => {
                         const v = e.target.value;
                         setName(v);
-                        setSlug(v.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40));
+                        const newSlug = v.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40);
+                        setSlug(newSlug);
+                        // Auto-fill admin details for convenience
+                        setOwnerName('Admin');
+                        setOwnerEmail(`admin@${newSlug || 'company'}.com`);
+                        if (!ownerPassword) setOwnerPassword('Admin@123');
                       }} />
                     </div>
                     <div className="space-y-2">
@@ -1026,29 +1039,63 @@ export default function SuperAdminCompanies() {
                 {/* Plan Tier Selector */}
                 <div>
                   <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3 block">Subscription Tier</Label>
-                  <div className="grid grid-cols-3 gap-3">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     {(['basic', 'pro', 'enterprise'] as const).map((t) => {
                       const isActive = configuringCompany?.plan_type === t;
                       const featCount = PLAN_DEFAULTS[t].length;
+                      const Icon = t === 'basic' ? Star : t === 'pro' ? Zap : Crown;
+                      const activeRing = t === 'basic' ? 'ring-slate-400' : t === 'pro' ? 'ring-blue-400' : 'ring-purple-400';
+                      const activeBg = t === 'basic' ? 'bg-gradient-to-br from-slate-50 to-white border-slate-300' : t === 'pro' ? 'bg-gradient-to-br from-blue-50 to-white border-blue-300' : 'bg-gradient-to-br from-purple-50 to-white border-purple-300';
+                      const iconColor = t === 'basic' ? 'text-slate-600' : t === 'pro' ? 'text-blue-600' : 'text-purple-600';
+                      const iconBg = t === 'basic' ? 'bg-slate-200' : t === 'pro' ? 'bg-blue-200' : 'bg-purple-200';
+                      const buttonBg = t === 'basic' ? 'bg-slate-800 hover:bg-slate-700' : t === 'pro' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-purple-600 hover:bg-purple-700';
+
                       return (
                         <button
                           key={t}
                           type="button"
                           onClick={() => applyPlanDefaults(t)}
-                          className={`p-4 rounded-xl border-2 text-left transition-all cursor-pointer ${
-                            isActive ? PLAN_ACTIVE_COLORS[t] : PLAN_CARD_COLORS[t]
+                          className={`relative flex flex-col p-5 rounded-2xl border transition-all duration-300 overflow-hidden group text-left ${
+                            isActive 
+                              ? `border-transparent ring-2 shadow-md ${activeRing} ${activeBg} scale-[1.02] z-10` 
+                              : 'border-border/60 bg-card hover:border-primary/30 hover:shadow-sm'
                           }`}
                         >
-                          <div className="flex items-center justify-between mb-2">
-                            <span className="text-sm font-bold capitalize">{t}</span>
-                            {isActive && <span className="text-xs bg-green-500 text-white px-2 py-0.5 rounded-full font-medium">Active</span>}
+                          {/* Background decoration for active */}
+                          {isActive && (
+                            <div className="absolute -right-6 -top-6 h-24 w-24 rounded-full bg-current opacity-5 blur-2xl pointer-events-none" style={{ color: t === 'pro' ? '#3b82f6' : t === 'enterprise' ? '#a855f7' : '#64748b' }} />
+                          )}
+
+                          <div className="flex items-start justify-between w-full mb-4">
+                            <div className={`p-2.5 rounded-xl ${isActive ? iconBg : 'bg-muted'} transition-colors shadow-sm`}>
+                              <Icon className={`h-5 w-5 ${isActive ? iconColor : 'text-muted-foreground group-hover:text-foreground'}`} />
+                            </div>
+                            {isActive && (
+                              <Badge className="bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 shadow-none border-0 font-bold px-2 py-0.5">
+                                Active
+                              </Badge>
+                            )}
                           </div>
-                          <p className="text-xs text-muted-foreground">{featCount} modules included</p>
-                          <p className="text-[10px] text-muted-foreground mt-1">
-                            {t === 'basic' && 'Core attendance + tasks'}
-                            {t === 'pro' && 'Basic + chat, kudos, helpdesk'}
-                            {t === 'enterprise' && 'All features unlocked'}
-                          </p>
+                          
+                          <div className="w-full flex-1">
+                            <h3 className={`font-heading text-lg font-bold capitalize mb-1 ${isActive ? 'text-foreground' : 'text-muted-foreground'}`}>{t}</h3>
+                            <div className="flex items-baseline gap-1.5 mb-2">
+                              <span className="text-3xl font-bold tracking-tight text-foreground">{featCount}</span> 
+                              <span className="text-sm font-medium text-muted-foreground">modules</span>
+                            </div>
+                            <p className="text-xs text-muted-foreground leading-relaxed h-8">
+                              {t === 'basic' && 'Core attendance & task management.'}
+                              {t === 'pro' && 'Everything in Basic + Chat & Helpdesk.'}
+                              {t === 'enterprise' && 'All premium features unlocked.'}
+                            </p>
+                          </div>
+
+                          {/* Selection indicator */}
+                          <div className={`mt-4 w-full rounded-full py-2 text-xs font-semibold tracking-wide text-center transition-all ${
+                            isActive ? `${buttonBg} text-white shadow-sm` : 'bg-secondary text-secondary-foreground group-hover:bg-primary group-hover:text-primary-foreground'
+                          }`}>
+                            {isActive ? 'CURRENT PLAN' : 'SELECT TIER'}
+                          </div>
                         </button>
                       );
                     })}

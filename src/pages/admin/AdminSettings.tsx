@@ -172,7 +172,7 @@ export default function AdminSettings() {
   if (!form) return null;
 
   function update<K extends keyof typeof form>(key: K, val: any) {
-    setForm({ ...form, [key]: val });
+    setForm((prev: any) => ({ ...prev, [key]: val }));
   }
 
   async function useMyLocation() {
@@ -190,7 +190,7 @@ export default function AdminSettings() {
       const companyId = isSuperAdmin ? selectedCompanyId : form.company_id;
       
       // 1. Update company branding and name
-      const { error: compErr } = await supabase.from('companies').update({
+      const { data: compData, error: compErr } = await supabase.from('companies').update({
         name: form.company_name,
         logo_url: form.logo_url,
         theme_color: form.theme_color,
@@ -198,11 +198,21 @@ export default function AdminSettings() {
         email: form.email,
         phone: form.phone,
         employee_id_prefix: form.employee_id_prefix?.trim()?.toUpperCase() || null,
-      } as any).eq('id', companyId);
+      } as any).eq('id', companyId).select('id');
+      
       if (compErr) throw compErr;
+      if (!compData || compData.length === 0) {
+        throw new Error('Permission denied to update company profile, or company not found.');
+      }
 
-      // 2. Update company settings (using upsert to handle missing rows)
-      const { error: setErr } = await supabase.from('company_settings').upsert({
+      // 2. Update company settings (explicit check to avoid ON CONFLICT errors)
+      const { data: existingSettings } = await supabase
+        .from('company_settings')
+        .select('company_id')
+        .eq('company_id', companyId)
+        .maybeSingle();
+
+      const settingsPayload = {
         company_id: companyId,
         company_name: form.company_name,
         office_latitude: Number(form.office_latitude),
@@ -216,8 +226,23 @@ export default function AdminSettings() {
         casual_leave_quota: Number(form.casual_leave_quota),
         leave_approval_sla_hours: Number(form.leave_approval_sla_hours),
         face_recognition_sensitivity: Number(form.face_recognition_sensitivity),
-      } as any);
-      if (setErr) throw setErr;
+      };
+
+      let setErr;
+      if (existingSettings) {
+        const res = await supabase.from('company_settings').update(settingsPayload).eq('company_id', companyId).select('company_id');
+        setErr = res.error;
+        if (!res.data || res.data.length === 0) throw new Error('Update failed or permission denied on company_settings');
+      } else {
+        const res = await supabase.from('company_settings').insert(settingsPayload).select('company_id');
+        setErr = res.error;
+        if (!res.data || res.data.length === 0) throw new Error('Insert failed or permission denied on company_settings');
+      }
+      
+      if (setErr) {
+        console.error("Settings Error:", setErr);
+        throw setErr;
+      }
 
       toast.success('Settings saved');
       log('settings.updated', 'settings', companyId, { company_name: form.company_name });
@@ -410,7 +435,7 @@ export default function AdminSettings() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Company name</Label>
-              <Input value={form.company_name} onChange={(e) => update('company_name', e.target.value)} />
+              <Input value={form.company_name || ''} onChange={(e) => update('company_name', e.target.value)} />
             </div>
             <div className="space-y-2">
               <Label>Business Email</Label>

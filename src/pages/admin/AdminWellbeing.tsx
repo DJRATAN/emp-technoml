@@ -37,19 +37,34 @@ export default function AdminWellbeing() {
       // 1. Fetch Moods for today
       const { data: moods } = await supabase
         .from('employee_moods' as any)
-        .select('*, profiles:user_id(full_name, department)')
+        .select('*')
         .eq('company_id', user.companyId)
         .eq('date', todayStr);
 
       // 2. Fetch Attendance for last 7 days
       const { data: attendance } = await supabase
         .from('attendance')
-        .select('*, profiles:user_id(full_name, department)')
+        .select('*')
         .eq('company_id', user.companyId)
         .gte('date', sevenDaysAgoStr);
 
-      const mData = (moods as any) ?? [];
-      const aData = (attendance as any) ?? [];
+      // 3. Fetch all profiles for name/department lookup
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, full_name, department')
+        .eq('company_id', user.companyId);
+
+      const profileMap = new Map((profiles ?? []).map(p => [p.id, p]));
+
+      // Merge profile data into moods and attendance
+      const mData = (moods as any[] ?? []).map((m: any) => ({
+        ...m,
+        profiles: profileMap.get(m.user_id) || null,
+      }));
+      const aData = (attendance ?? []).map((a: any) => ({
+        ...a,
+        profiles: profileMap.get(a.user_id) || null,
+      }));
 
       // Calculate Company Average Mood
       if (mData.length > 0) {

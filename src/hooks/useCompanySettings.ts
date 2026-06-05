@@ -31,13 +31,18 @@ export function useCompanySettings() {
   const [loading, setLoading] = useState(true);
 
   const fetchSettings = useCallback(async () => {
-    if (!user?.companyId) { setLoading(false); return; }
+    console.log('[Settings Debug] user.companyId =', user?.companyId);
+    if (!user?.companyId) { console.log('[Settings Debug] No companyId, returning defaults'); setLoading(false); return; }
     
     // Fetch both settings and company branding (including name, email, phone, address, and prefix)
     const [settingsRes, companyRes] = await Promise.all([
       supabase.from('company_settings').select('*').eq('company_id', user.companyId).maybeSingle(),
       supabase.from('companies').select('name, logo_url, theme_color, address, email, phone, employee_id_prefix' as any).eq('id', user.companyId).maybeSingle()
     ]);
+
+    console.log('[Settings Debug] settingsRes.data =', settingsRes.data);
+    console.log('[Settings Debug] settingsRes.error =', settingsRes.error);
+    console.log('[Settings Debug] companyRes.data =', companyRes.data);
 
     if (settingsRes.data) {
       setSettings({
