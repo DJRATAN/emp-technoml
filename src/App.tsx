@@ -104,8 +104,11 @@ function ProtectedRoute({ children, allow }: { children: React.ReactNode; allow:
   if (loading) return <FullscreenLoader />;
   if (!isAuthenticated || !user) return <Navigate to="/" replace />;
   if (user.status !== 'approved' && user.role !== 'super_admin') return <Navigate to="/pending" replace />;
-  // Company owners get admin-level access
-  const hasAccess = allow.includes(user.role) || (user.isOwner && allow.includes('admin'));
+  // Admins have access to employee features; Company owners get admin-level access
+  const hasAccess = 
+    allow.includes(user.role) || 
+    (user.role === 'admin' && allow.includes('employee')) ||
+    (user.isOwner && allow.includes('admin'));
   if (!hasAccess) {
     const home = user.role === 'super_admin' ? '/super-admin' : (user.role === 'admin' || user.isOwner) ? '/admin' : `/${user.role}`;
     return <Navigate to={home} replace />;
