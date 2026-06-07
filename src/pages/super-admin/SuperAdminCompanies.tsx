@@ -241,7 +241,7 @@ export default function SuperAdminCompanies() {
       
       // Efficiently count employees per company using a single query if possible, 
       // or map them if the list is small enough. For now, let's use the count feature.
-      const companiesWithCounts = await Promise.all((cs ?? []).map(async (c) => {
+      const companiesWithCounts: CompanyRow[] = await Promise.all((cs ?? []).map(async (c) => {
         const { count } = await supabase
           .from('profiles')
           .select('*', { count: 'exact', head: true })
@@ -266,8 +266,9 @@ export default function SuperAdminCompanies() {
           ...c, 
           employee_count: count ?? 0,
           owner_name: ownerName,
-          owner_email: ownerEmail
-        };
+          owner_email: ownerEmail,
+          plan_type: (c.plan_type || 'basic') as 'basic' | 'pro' | 'enterprise'
+        } as CompanyRow;
       }));
       
       setCompanies(companiesWithCounts);
