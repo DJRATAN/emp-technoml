@@ -68,13 +68,13 @@ export default function AdminWellbeing() {
 
       // Calculate Company Average Mood
       if (mData.length > 0) {
-        const sum = mData.reduce((acc: number, m: any) => acc + m.score, 0);
+        const sum = mData.reduce((acc: number, m: any) => acc + (m.mood ?? m.score), 0);
         setAverageMood(sum / mData.length);
         
         // Distribution
         const dist = [1, 2, 3, 4, 5].map(score => ({
           score,
-          count: mData.filter((m: any) => m.score === score).length
+          count: mData.filter((m: any) => (m.mood ?? m.score) === score).length
         }));
         setMoodDistribution(dist);
       } else {
@@ -109,7 +109,8 @@ export default function AdminWellbeing() {
 
       userStats.forEach((stats, userId) => {
         const avgHours = stats.shifts > 0 ? stats.totalHours / stats.shifts : 0;
-        const todayMood = mData.find((m: any) => m.user_id === userId)?.score || null;
+        const userMoodObj = mData.find((m: any) => m.user_id === userId);
+        const todayMood = userMoodObj ? (userMoodObj.mood ?? userMoodObj.score) : null;
         
         const reasons: string[] = [];
         let riskScore = 0;

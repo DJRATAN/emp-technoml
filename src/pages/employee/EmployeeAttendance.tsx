@@ -147,7 +147,7 @@ export default function EmployeeAttendance() {
         company_id: user.companyId,
         user_id: user.id,
         date: todayStr,
-        score,
+        mood: score,
         note
       });
       if (error) throw error;
@@ -155,7 +155,8 @@ export default function EmployeeAttendance() {
       setShowMoodDialog(false);
       navigate('/employee');
     } catch (e: any) {
-      toast.error('Failed to save mood');
+      console.error("Error saving mood:", e);
+      toast.error(e?.message || 'Failed to save mood');
     } finally {
       setIsSubmittingMood(false);
     }
