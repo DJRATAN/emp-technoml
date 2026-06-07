@@ -252,8 +252,8 @@ export default function EmployeeAttendance() {
                   <th className="py-2 pr-4">Date</th><th className="py-2 pr-4">Check-in</th><th className="py-2 pr-4">Check-out</th><th className="py-2 pr-4">Distance</th><th className="py-2">Status</th>
                 </tr></thead>
                 <tbody>
-                  {history.map((r) => (
-                    <tr key={r.id} className="border-b last:border-0">
+                  {history.map((r, index) => (
+                    <tr key={r.id || index} className="border-b last:border-0">
                       <td className="py-3 pr-4">{r.date}</td>
                       <td className="py-3 pr-4">{formatTime(r.check_in)}</td>
                       <td className="py-3 pr-4">{formatTime(r.check_out)}</td>
@@ -334,8 +334,8 @@ export default function EmployeeAttendance() {
             <p className="text-sm text-muted-foreground py-4 text-center">No correction requests.</p>
           ) : (
             <div className="space-y-2">
-              {corrections.map((c: any) => (
-                <div key={c.id} className="flex items-center justify-between p-3 rounded-xl border bg-card">
+              {corrections.map((c: any, index) => (
+                <div key={c.id || index} className="flex items-center justify-between p-3 rounded-xl border bg-card">
                   <div className="min-w-0">
                     <p className="text-sm font-medium">{c.date}</p>
                     <p className="text-xs text-muted-foreground truncate">{c.reason}</p>
