@@ -89,7 +89,6 @@ export default function AdminEmployeeDetail() {
     setResettingPassword(true);
 
     try {
-      console.log('Initiating password reset for user ID:', id);
       const { data, error } = await (supabase as any).rpc('admin_reset_password', {
         p_user_id: id, 
         p_new_password: newPassword.trim()

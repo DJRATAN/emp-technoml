@@ -233,10 +233,7 @@ export default function AdminTasks() {
     const profilesQuery = supabase.from('profiles').select('id, full_name').eq('status', 'approved').order('full_name');
     if (user?.companyId) profilesQuery.eq('company_id', user.companyId);
 
-    const { data: t, error: tErr } = await supabase.from('tasks').select('*').order('created_at', { ascending: false });
-    
-    console.log('[AdminTasks Debug] User:', { id: user?.id, role: user?.role, companyId: user?.companyId });
-    console.log('[AdminTasks Debug] Raw count from DB:', t?.length, tErr);
+    const { data: t } = await supabase.from('tasks').select('*').order('created_at', { ascending: false });
 
     const [p, r] = await Promise.all([
       profilesQuery,
@@ -253,7 +250,6 @@ export default function AdminTasks() {
       const userCoId = String(user?.companyId || '');
       
       const isMatch = !task.company_id || taskCoId === userCoId;
-      console.log(`[AdminTasks Debug] Task ${task.id}: company_id=${task.company_id}, match=${isMatch}`);
       return isMatch;
     });
     const tasksData = validTasks.map(task => ({

@@ -61,8 +61,6 @@ function NavigationDebugger() {
   const lastPath = useRef(location.pathname);
 
   useEffect(() => {
-    console.log(`[Navigation] Path changed: ${lastPath.current} -> ${location.pathname}`);
-    
     // If we hit /design-guide (likely from external tool), redirect to our actual dashboard
     if (location.pathname.includes('design-guide')) {
       console.warn('[Navigation] Intercepted rogue design-guide redirect. Returning to dashboard...');

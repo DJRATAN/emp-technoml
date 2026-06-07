@@ -281,13 +281,11 @@ export default function SuperAdminCompanies() {
   }, [loadPending]);
 
   async function approveUser(id: string) {
-    console.log('Approving user:', id);
     const { data, error } = await supabase
       .from('profiles')
       .update({ status: 'approved' } as any)
       .eq('id', id)
       .select('id, status');
-    console.log('Approve result:', { data, error });
     if (error) return toast.error('Approve failed: ' + error.message);
     if (!data || data.length === 0) {
       toast.error('Update blocked by RLS policy. Check database permissions.');
@@ -299,13 +297,11 @@ export default function SuperAdminCompanies() {
   }
 
   async function rejectUser(id: string) {
-    console.log('Rejecting user:', id);
     const { data, error } = await supabase
       .from('profiles')
       .update({ status: 'rejected' } as any)
       .eq('id', id)
       .select('id, status');
-    console.log('Reject result:', { data, error });
     if (error) return toast.error('Reject failed: ' + error.message);
     if (!data || data.length === 0) {
       toast.error('Update blocked by RLS policy. Check database permissions.');
