@@ -26,7 +26,7 @@ function Navbar() {
   const links = ["Features", "How It Works", "Pricing", "Testimonials", "FAQ"];
   return (
     <nav className="w-full sticky top-0 z-50 border-b border-border/60 bg-background/80 backdrop-blur-md">
-      <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 lg:px-8">
+      <div className="mx-auto flex max-w-[90%] xl:max-w-[1600px] items-center justify-between px-4 py-3 lg:px-8">
         <div className="flex items-center gap-2">
           <img src="/logo.png" alt="TechnoML" className="h-8 w-8" />
           <span className="font-[Poppins] text-xl font-bold text-primary">TechnoML</span>
@@ -60,7 +60,7 @@ function HeroSection() {
   const navigate = useNavigate();
   return (
     <section className="w-full relative overflow-hidden bg-gradient-to-br from-primary/5 via-background to-accent/30 py-16 lg:py-24">
-      <div className="mx-auto grid max-w-7xl items-center gap-12 px-4 lg:grid-cols-2 lg:px-8">
+      <div className="mx-auto grid max-w-[90%] xl:max-w-[1600px] items-center gap-12 px-4 lg:grid-cols-2 lg:px-8">
         <div className="space-y-6">
           <Badge variant="secondary" className="px-3 py-1 text-xs font-semibold">🚀 #1 Employee Management Platform in India</Badge>
           <h1 className="font-[Poppins] text-4xl font-bold leading-tight text-foreground lg:text-5xl xl:text-6xl">
@@ -107,7 +107,7 @@ function StatsBar() {
   ];
   return (
     <section className="w-full border-y border-border/60 bg-card py-10">
-      <div className="mx-auto grid max-w-5xl grid-cols-2 gap-8 px-4 lg:grid-cols-4 lg:px-8">
+      <div className="mx-auto grid max-w-[90%] xl:max-w-[1400px] grid-cols-2 gap-8 px-4 lg:grid-cols-4 lg:px-8">
         {stats.map((s) => (
           <div key={s.label} className="flex flex-col items-center gap-1 text-center">
             <s.icon className="mb-1 h-6 w-6 text-primary" />
@@ -186,7 +186,7 @@ function FeaturesSection() {
 
   return (
     <section id="features" className="w-full bg-background py-16 lg:py-24">
-      <div className="mx-auto max-w-7xl px-4 lg:px-8">
+      <div className="mx-auto max-w-[90%] xl:max-w-[1600px] px-4 lg:px-8">
         <div className="mb-12 text-center">
           <Badge variant="secondary" className="mb-3">Features</Badge>
           <h2 className="font-[Poppins] text-3xl font-bold text-foreground lg:text-4xl">Everything You Need to Manage Your Workforce</h2>
@@ -244,7 +244,7 @@ function HowItWorks() {
   ];
   return (
     <section id="how-it-works" className="w-full bg-accent/20 py-16 lg:py-24">
-      <div className="mx-auto max-w-6xl px-4 lg:px-8">
+      <div className="mx-auto max-w-[90%] xl:max-w-[1600px] px-4 lg:px-8">
         <div className="mb-12 text-center">
           <Badge variant="secondary" className="mb-3">How It Works</Badge>
           <h2 className="font-[Poppins] text-3xl font-bold text-foreground lg:text-4xl">Get Started in 4 Simple Steps</h2>
@@ -276,7 +276,7 @@ function RoleComparison() {
   ];
   return (
     <section className="w-full bg-background py-16 lg:py-24">
-      <div className="mx-auto max-w-4xl px-4 lg:px-8">
+      <div className="mx-auto max-w-[90%] xl:max-w-[1400px] px-4 lg:px-8">
         <div className="mb-10 text-center">
           <Badge variant="secondary" className="mb-3">Roles</Badge>
           <h2 className="font-[Poppins] text-3xl font-bold text-foreground lg:text-4xl">Built for Everyone</h2>
@@ -348,7 +348,7 @@ function PricingSection() {
   ];
   return (
     <section id="pricing" className="w-full bg-accent/20 py-16 lg:py-24">
-      <div className="mx-auto max-w-6xl px-4 lg:px-8">
+      <div className="mx-auto max-w-[90%] xl:max-w-[1600px] px-4 lg:px-8">
         <div className="mb-12 text-center">
           <Badge variant="secondary" className="mb-3">Pricing</Badge>
           <h2 className="font-[Poppins] text-3xl font-bold text-foreground lg:text-4xl">Simple, Transparent Pricing</h2>
@@ -391,7 +391,7 @@ function TestimonialsSection() {
   ];
   return (
     <section id="testimonials" className="w-full bg-background py-16 lg:py-24">
-      <div className="mx-auto max-w-6xl px-4 lg:px-8">
+      <div className="mx-auto max-w-[90%] xl:max-w-[1600px] px-4 lg:px-8">
         <div className="mb-12 text-center">
           <Badge variant="secondary" className="mb-3">Testimonials</Badge>
           <h2 className="font-[Poppins] text-3xl font-bold text-foreground lg:text-4xl">Trusted by Teams Across India</h2>
@@ -434,7 +434,7 @@ function FAQSection() {
   ];
   return (
     <section id="faq" className="w-full bg-accent/20 py-16 lg:py-24">
-      <div className="mx-auto max-w-3xl px-4 lg:px-8">
+      <div className="mx-auto max-w-[90%] xl:max-w-[1100px] px-4 lg:px-8">
         <div className="mb-10 text-center">
           <Badge variant="secondary" className="mb-3">FAQ</Badge>
           <h2 className="font-[Poppins] text-3xl font-bold text-foreground lg:text-4xl">Frequently Asked Questions</h2>
@@ -465,7 +465,7 @@ function CTASection() {
       <div className="absolute -top-24 -left-24 h-96 w-96 rounded-full bg-primary/30 blur-3xl filter"></div>
       <div className="absolute -bottom-24 -right-24 h-96 w-96 rounded-full bg-blue-500/20 blur-3xl filter"></div>
       
-      <div className="relative mx-auto max-w-4xl px-4 text-center lg:px-8">
+      <div className="relative mx-auto max-w-[90%] xl:max-w-[1400px] px-4 text-center lg:px-8">
         <div className="rounded-3xl border border-white/10 bg-white/5 p-8 backdrop-blur-md shadow-2xl lg:p-16">
           <h2 className="font-[Poppins] text-4xl font-extrabold text-white lg:text-5xl tracking-tight">
             Ready to Transform Your <span className="bg-gradient-to-r from-blue-400 to-primary bg-clip-text text-transparent">Workforce Management?</span>
@@ -525,7 +525,7 @@ function Footer() {
   ];
   return (
     <footer className="w-full border-t border-border/40 bg-slate-50 pt-16 pb-8 dark:bg-background">
-      <div className="mx-auto grid max-w-7xl gap-12 px-4 md:grid-cols-5 lg:px-8">
+      <div className="mx-auto grid max-w-[90%] xl:max-w-[1600px] gap-12 px-4 md:grid-cols-5 lg:px-8">
         <div className="md:col-span-2">
           <div className="flex items-center gap-2 mb-4">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary shadow-sm">
@@ -582,7 +582,7 @@ function Footer() {
         ))}
       </div>
       
-      <div className="mx-auto mt-16 max-w-7xl border-t border-slate-200/60 px-4 pt-8 dark:border-border/40 lg:px-8">
+      <div className="mx-auto mt-16 max-w-[90%] xl:max-w-[1600px] border-t border-slate-200/60 px-4 pt-8 dark:border-border/40 lg:px-8">
         <div className="flex flex-col items-center justify-between gap-4 md:flex-row">
           <p className="text-sm text-slate-500 dark:text-muted-foreground">
             © {new Date().getFullYear()} TechnoML. All rights reserved.
