@@ -25,7 +25,7 @@ function Navbar() {
   const [open, setOpen] = useState(false);
   const links = ["Features", "How It Works", "Pricing", "Testimonials", "FAQ"];
   return (
-    <nav className="sticky top-0 z-50 border-b border-border/60 bg-background/80 backdrop-blur-md">
+    <nav className="w-full sticky top-0 z-50 border-b border-border/60 bg-background/80 backdrop-blur-md">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 lg:px-8">
         <div className="flex items-center gap-2">
           <img src="/logo.png" alt="TechnoML" className="h-8 w-8" />
@@ -59,15 +59,15 @@ function Navbar() {
 function HeroSection() {
   const navigate = useNavigate();
   return (
-    <section className="relative overflow-hidden bg-gradient-to-br from-primary/5 via-background to-accent/30 py-16 lg:py-24">
+    <section className="w-full relative overflow-hidden bg-gradient-to-br from-primary/5 via-background to-accent/30 py-16 lg:py-24">
       <div className="mx-auto grid max-w-7xl items-center gap-12 px-4 lg:grid-cols-2 lg:px-8">
         <div className="space-y-6">
-          <Badge variant="secondary" className="px-3 py-1 text-xs font-semibold">🚀 #1 Employee Management Platform</Badge>
+          <Badge variant="secondary" className="px-3 py-1 text-xs font-semibold">🚀 #1 Employee Management Platform in India</Badge>
           <h1 className="font-[Poppins] text-4xl font-bold leading-tight text-foreground lg:text-5xl xl:text-6xl">
             Smart <span className="text-primary">Employee Management</span> Software
           </h1>
           <p className="max-w-lg text-lg text-muted-foreground">
-            Face-verified attendance, GPS geofencing, leave management, task tracking, real-time analytics — all in one powerful platform designed for modern teams.
+            Face-verified attendance, GPS geofencing, leave management, task tracking, real-time analytics — all in one powerful platform designed for modern Indian teams.
           </p>
           <div className="flex flex-wrap gap-3">
             <Button size="lg" onClick={() => navigate("/login")} className="gap-2">Start Free Trial <ArrowRight className="h-4 w-4" /></Button>
@@ -89,8 +89,8 @@ function HeroSection() {
             <span className="flex items-center gap-1"><CheckCircle2 className="h-4 w-4 text-green-500" /> Cancel anytime</span>
           </div>
         </div>
-        <div className="relative">
-          <img src={heroDashboard} alt="TechnoML dashboard preview" width={1280} height={800} className="rounded-2xl shadow-2xl ring-1 ring-border" />
+        <div className="relative w-full">
+          <img src={heroDashboard} alt="TechnoML dashboard preview" width={1280} height={800} className="w-full rounded-2xl shadow-2xl ring-1 ring-border" />
         </div>
       </div>
     </section>
@@ -106,7 +106,7 @@ function StatsBar() {
     { label: "Countries", value: "30+", icon: MapPin },
   ];
   return (
-    <section className="border-y border-border/60 bg-card py-10">
+    <section className="w-full border-y border-border/60 bg-card py-10">
       <div className="mx-auto grid max-w-5xl grid-cols-2 gap-8 px-4 lg:grid-cols-4 lg:px-8">
         {stats.map((s) => (
           <div key={s.label} className="flex flex-col items-center gap-1 text-center">
@@ -185,7 +185,7 @@ function FeaturesSection() {
   const preview = previewOpen ? FEATURE_PREVIEWS[previewOpen] : null;
 
   return (
-    <section id="features" className="bg-background py-16 lg:py-24">
+    <section id="features" className="w-full bg-background py-16 lg:py-24">
       <div className="mx-auto max-w-7xl px-4 lg:px-8">
         <div className="mb-12 text-center">
           <Badge variant="secondary" className="mb-3">Features</Badge>
@@ -243,7 +243,7 @@ function HowItWorks() {
     { num: "04", title: "Go Live & Manage", desc: "Employees check in, apply for leave, track tasks — admins monitor everything in real-time." },
   ];
   return (
-    <section id="how-it-works" className="bg-accent/20 py-16 lg:py-24">
+    <section id="how-it-works" className="w-full bg-accent/20 py-16 lg:py-24">
       <div className="mx-auto max-w-6xl px-4 lg:px-8">
         <div className="mb-12 text-center">
           <Badge variant="secondary" className="mb-3">How It Works</Badge>
@@ -275,7 +275,7 @@ function RoleComparison() {
     { feature: "Chat & Kudos", employee: "Send messages & kudos", admin: "Manage channels" },
   ];
   return (
-    <section className="bg-background py-16 lg:py-24">
+    <section className="w-full bg-background py-16 lg:py-24">
       <div className="mx-auto max-w-4xl px-4 lg:px-8">
         <div className="mb-10 text-center">
           <Badge variant="secondary" className="mb-3">Roles</Badge>
@@ -317,18 +317,37 @@ function PricingSection() {
       cta: "Start Free", popular: false,
     },
     {
-      name: "Professional", price: "₹199", period: "/user/mo", desc: "For growing businesses",
-      features: ["Unlimited employees", "Everything in Starter", "Tasks, targets & workflows", "Payroll & payslips", "Team chat & kudos", "Role-based access control", "Audit logs", "Priority support"],
+      name: "Professional", price: "₹99", period: "/user/mo", desc: "For growing Indian businesses",
+      features: [
+        "Unlimited employees", 
+        "Everything in Starter", 
+        "EPF, ESI & Professional Tax payroll compliance",
+        "GST-compliant tax invoices",
+        "Tasks, targets & workflows", 
+        "Payroll & downloadable payslips", 
+        "Team chat & kudos wall", 
+        "Audit logs & role matrices", 
+        "Priority support"
+      ],
       cta: "Start Trial", popular: true,
     },
     {
       name: "Enterprise", price: "Custom", period: "", desc: "For large organizations",
-      features: ["Everything in Professional", "Custom branding & white-labeling", "SSO / SAML integration", "API access & webhooks", "Dedicated account manager", "On-premise deployment", "SLA guarantee", "Custom integrations"],
+      features: [
+        "Everything in Professional", 
+        "Custom branding & white-labeling", 
+        "SSO / SAML integration", 
+        "API access & webhooks", 
+        "Custom Indian compliance support (Gratuity, LWF)",
+        "Dedicated account manager", 
+        "On-premise deployment option", 
+        "Custom integrations"
+      ],
       cta: "Contact Sales", popular: false,
     },
   ];
   return (
-    <section id="pricing" className="bg-accent/20 py-16 lg:py-24">
+    <section id="pricing" className="w-full bg-accent/20 py-16 lg:py-24">
       <div className="mx-auto max-w-6xl px-4 lg:px-8">
         <div className="mb-12 text-center">
           <Badge variant="secondary" className="mb-3">Pricing</Badge>
@@ -366,16 +385,16 @@ function PricingSection() {
 /* ─── Testimonials ─── */
 function TestimonialsSection() {
   const items = [
-    { img: testimonial1, name: "Rajesh Kumar", role: "CTO, TechBite Solutions", text: "TechnoML transformed our attendance process. Face verification eliminated buddy punching completely. The geofencing gives us peace of mind for remote offices across India." },
-    { img: testimonial2, name: "Priya Sharma", role: "HR Head, ZenithWorks", text: "We went from spreadsheets to a fully automated system in one day. The multi-level approval chains and real-time analytics saved our HR team hours every week." },
-    { img: testimonial3, name: "Ananya Singh", role: "Director, CloudScale", text: "The security features, granular roles, and audit logs made it an easy choice for our enterprise. It's the most robust multi-tenant system we've used." },
+    { img: testimonial1, name: "Rajesh Kumar", role: "CTO, TechBite Solutions (Bengaluru)", text: "TechnoML transformed our attendance process. Face verification eliminated buddy punching completely. The geofencing gives us peace of mind for remote offices across India." },
+    { img: testimonial2, name: "Priya Sharma", role: "HR Head, ZenithWorks (New Delhi)", text: "We went from spreadsheets to a fully automated system in one day. The multi-level approval chains and real-time analytics saved our HR team hours every week." },
+    { img: testimonial3, name: "Ananya Singh", role: "Director, CloudScale (Mumbai)", text: "The security features, granular roles, and audit logs made it an easy choice for our enterprise. It's the most robust multi-tenant system we've used." },
   ];
   return (
-    <section id="testimonials" className="bg-background py-16 lg:py-24">
+    <section id="testimonials" className="w-full bg-background py-16 lg:py-24">
       <div className="mx-auto max-w-6xl px-4 lg:px-8">
         <div className="mb-12 text-center">
           <Badge variant="secondary" className="mb-3">Testimonials</Badge>
-          <h2 className="font-[Poppins] text-3xl font-bold text-foreground lg:text-4xl">Trusted by Teams Worldwide</h2>
+          <h2 className="font-[Poppins] text-3xl font-bold text-foreground lg:text-4xl">Trusted by Teams Across India</h2>
         </div>
         <div className="grid gap-8 md:grid-cols-3">
           {items.map((t) => (
@@ -410,10 +429,11 @@ function FAQSection() {
     { q: "Is my company data secure?", a: "Absolutely. Each company has full tenant isolation with row-level security. All data is encrypted in transit and at rest. We follow SOC-2 security practices." },
     { q: "Can I import employee data in bulk?", a: "Yes. The CSV bulk upload feature lets you import employee targets, assignments, and more with preview and validation before saving." },
     { q: "Do you support multi-level leave approvals?", a: "Yes. You can configure approval chains with up to N steps — for example, Team Lead → Department Head → HR — all customizable per company." },
+    { q: "Do you support Indian tax and payroll compliance like EPF, ESI, and GST?", a: "Yes, absolutely! TechnoML is fully customized for Indian businesses. We support EPF, ESI, Professional Tax calculations, and automatically generate GST-compliant tax invoices for your subscription." },
     { q: "What integrations do you support?", a: "We support SSO/SAML, calendar sync, payroll export, and API access. Enterprise plans include custom integration support." },
   ];
   return (
-    <section id="faq" className="bg-accent/20 py-16 lg:py-24">
+    <section id="faq" className="w-full bg-accent/20 py-16 lg:py-24">
       <div className="mx-auto max-w-3xl px-4 lg:px-8">
         <div className="mb-10 text-center">
           <Badge variant="secondary" className="mb-3">FAQ</Badge>
@@ -439,7 +459,7 @@ function FAQSection() {
 function CTASection() {
   const navigate = useNavigate();
   return (
-    <section className="relative overflow-hidden bg-slate-900 py-24 lg:py-32">
+    <section className="w-full relative overflow-hidden bg-slate-900 py-24 lg:py-32">
       {/* Decorative background elements */}
       <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 mix-blend-overlay"></div>
       <div className="absolute -top-24 -left-24 h-96 w-96 rounded-full bg-primary/30 blur-3xl filter"></div>
@@ -504,7 +524,7 @@ function Footer() {
     { title: "Support", links: ["Help Center", "Contact", "Status", "Security", "Privacy Policy"] },
   ];
   return (
-    <footer className="border-t border-border/40 bg-slate-50 pt-16 pb-8 dark:bg-background">
+    <footer className="w-full border-t border-border/40 bg-slate-50 pt-16 pb-8 dark:bg-background">
       <div className="mx-auto grid max-w-7xl gap-12 px-4 md:grid-cols-5 lg:px-8">
         <div className="md:col-span-2">
           <div className="flex items-center gap-2 mb-4">
@@ -514,7 +534,7 @@ function Footer() {
             <span className="font-[Poppins] text-2xl font-bold text-slate-900 dark:text-white">TechnoML</span>
           </div>
           <p className="mt-2 text-sm text-slate-600 dark:text-muted-foreground max-w-sm leading-relaxed">
-            Smart employee management for modern businesses. Streamline attendance, tasks, and leave seamlessly.
+            Smart employee management for modern Indian businesses. Streamline attendance, tasks, and leave seamlessly.
           </p>
           
           {/* Elegant Email signup */}
@@ -600,7 +620,7 @@ function CompanySelector() {
   };
 
   return (
-    <section className="bg-background py-12 lg:py-16">
+    <section className="w-full bg-background py-12 lg:py-16">
       <div className="mx-auto max-w-md px-4 text-center">
         <Badge variant="secondary" className="mb-3">Get Started</Badge>
         <h2 className="mb-2 font-[Poppins] text-2xl font-bold text-foreground">Find Your Company</h2>
@@ -632,7 +652,7 @@ function CompanySelector() {
 /* ─── Main Page ─── */
 export default function LandingPage() {
   return (
-    <div className="min-h-screen bg-background">
+    <div className="w-full min-h-screen bg-background">
       <Navbar />
       <HeroSection />
       <StatsBar />

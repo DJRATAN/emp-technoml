@@ -32,10 +32,12 @@ const PLANS = [
     name: "Professional",
     price: "₹99",
     period: "/user/mo",
-    desc: "For growing businesses",
+    desc: "For growing Indian businesses",
     features: [
       "Unlimited employees",
       "Everything in Starter",
+      "EPF, ESI & Professional Tax payroll compliance",
+      "GST-compliant tax invoices",
       "Tasks & targets with approval chains",
       "Payroll & downloadable payslips",
       "Admin broadcasts & read receipts",
@@ -66,6 +68,7 @@ const PLANS = [
       "SLA guarantee",
       "Predictive attrition analytics",
       "Advanced anti-fraud (IP whitelist)",
+      "Custom Indian compliance support (Gratuity, LWF)",
       "Custom integrations",
     ],
     cta: "Contact Sales",
@@ -104,9 +107,9 @@ export default function PricingPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="w-full min-h-screen bg-background">
       {/* Top nav */}
-      <nav className="sticky top-0 z-50 border-b border-border/60 bg-background/80 backdrop-blur-md">
+      <nav className="w-full sticky top-0 z-50 border-b border-border/60 bg-background/80 backdrop-blur-md">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 lg:px-8">
           <Link to="/" className="font-[Poppins] text-xl font-bold text-primary">TechnoML</Link>
           <div className="flex gap-3">
@@ -116,7 +119,7 @@ export default function PricingPage() {
         </div>
       </nav>
 
-      <section className="py-16 lg:py-24">
+      <section className="w-full py-16 lg:py-24">
         <div className="mx-auto max-w-6xl px-4 lg:px-8">
           <div className="mb-4">
             <Button variant="ghost" size="sm" onClick={() => navigate("/")} className="gap-1 text-muted-foreground">
