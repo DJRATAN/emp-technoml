@@ -206,12 +206,12 @@ export default function EmployeeAttendance() {
               <div className="text-center py-10"><Loader2 className="h-8 w-8 animate-spin mx-auto text-primary mb-3" /><p className="text-sm text-muted-foreground">Verifying your location…</p></div>
             ) : step === 'camera' ? (
               <div className="space-y-3">
-                <div className="rounded-xl overflow-hidden bg-black aspect-square"><video ref={videoRef} className="w-full h-full object-cover" playsInline muted /></div>
+                <div className="rounded-xl overflow-hidden bg-black aspect-square"><video ref={videoRef} className="w-full h-full object-cover mirror" playsInline muted /></div>
                 <Button onClick={capture} className="w-full"><Camera className="h-4 w-4 mr-2" />Capture Selfie</Button>
               </div>
             ) : step === 'preview' && photoUrl ? (
               <div className="space-y-3">
-                <div className="rounded-xl overflow-hidden bg-muted aspect-square"><img src={photoUrl} alt="Selfie preview" className="w-full h-full object-cover" /></div>
+                <div className="rounded-xl overflow-hidden bg-muted aspect-square"><img src={photoUrl} alt="Selfie preview" className="w-full h-full object-cover mirror" /></div>
                 <div className="grid grid-cols-2 gap-2">
                   <Button variant="outline" onClick={retake}><RotateCcw className="h-4 w-4 mr-2" />Retake</Button>
                   <Button onClick={submit}><CheckCircle2 className="h-4 w-4 mr-2" />Submit</Button>
